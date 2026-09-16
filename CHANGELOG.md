@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.7.0 — 2026-09-16
+
 ### Changed
 
 - **Summaries** and **Panel** are one screen. They were showing the same
