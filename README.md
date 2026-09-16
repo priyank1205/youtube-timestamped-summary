@@ -8,8 +8,8 @@
 
 A sectioned, timestamped AI summary lives in the YouTube sidebar — click any line to jump straight to that moment.
 
-[![CI](https://github.com/priyank1205/yt-transcript-ext/actions/workflows/ci.yml/badge.svg)](https://github.com/priyank1205/yt-transcript-ext/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/priyank1205/yt-transcript-ext?label=release&color=2ea043)](https://github.com/priyank1205/yt-transcript-ext/releases/latest)
+[![CI](https://github.com/priyank1205/youtube-timestamped-summary/actions/workflows/ci.yml/badge.svg)](https://github.com/priyank1205/youtube-timestamped-summary/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/priyank1205/youtube-timestamped-summary?label=release&color=2ea043)](https://github.com/priyank1205/youtube-timestamped-summary/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Chrome · Edge · Brave](https://img.shields.io/badge/Chrome%20%C2%B7%20Edge%20%C2%B7%20Brave-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](#install)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-success)](package.json)
@@ -151,7 +151,7 @@ The panel folds to a single bar and stays out of the way until you want it back.
 
 <br>
 
-1. Go to the **[latest release page](https://github.com/priyank1205/yt-transcript-ext/releases/latest)**.
+1. Go to the **[latest release page](https://github.com/priyank1205/youtube-timestamped-summary/releases/latest)**.
 2. Under **Assets**, click the file ending in **`.zip`** — something like `timestamped-summary-for-youtube-v1.2.zip`. It downloads like any other file.
 3. **Unzip it properly.** This step is where most people get stuck:
    - **Windows:** right-click the file → **Extract All…** → **Extract**. Do *not* just double-click and drag files out of the preview window — Windows will hand you an incomplete copy.
@@ -171,8 +171,8 @@ The panel folds to a single bar and stays out of the way until you want it back.
 The extension runs from the source tree as-is. There is no build step and nothing to install.
 
 ```bash
-git clone https://github.com/priyank1205/yt-transcript-ext.git
-cd yt-transcript-ext
+git clone https://github.com/priyank1205/youtube-timestamped-summary.git
+cd youtube-timestamped-summary
 ```
 
 The repo root *is* the extension folder — point **Load unpacked** at it. Update with `git pull`, then reload the extension and refresh your YouTube tabs.
@@ -349,7 +349,7 @@ Almost always a stale model id: a provider retired the model your settings named
 
 <br>
 
-This should not happen — every point is checked against the real transcript before it renders, and a response that loses too many points to that check is refused outright rather than shown. If you do see it, please [open an issue](https://github.com/priyank1205/yt-transcript-ext/issues/new/choose) with the video link and the output of the panel's **Copy details** button.
+This should not happen — every point is checked against the real transcript before it renders, and a response that loses too many points to that check is refused outright rather than shown. If you do see it, please [open an issue](https://github.com/priyank1205/youtube-timestamped-summary/issues/new/choose) with the video link and the output of the panel's **Copy details** button.
 
 </details>
 
@@ -567,8 +567,8 @@ There is **no all-sites permission**. Custom endpoints must use `https`; plain `
 No dependencies, no build step, no framework, no TypeScript. **Node 20 or newer** is all you need.
 
 ```bash
-git clone https://github.com/priyank1205/yt-transcript-ext.git
-cd yt-transcript-ext
+git clone https://github.com/priyank1205/youtube-timestamped-summary.git
+cd youtube-timestamped-summary
 npm run check
 ```
 
@@ -684,8 +684,8 @@ It reads whatever caption track the video has, so a non-English video is summari
 
 Bug reports and suggestions are welcome. This is a small, dependency-free extension, and changes are judged on whether they keep the moving parts few rather than on how much they add.
 
-- 🐛 [**Report a bug**](https://github.com/priyank1205/yt-transcript-ext/issues/new?template=bug_report.yml) — use the panel's *Copy details* button, never a raw log
-- 💡 [**Request a feature**](https://github.com/priyank1205/yt-transcript-ext/issues/new?template=feature_request.yml)
+- 🐛 [**Report a bug**](https://github.com/priyank1205/youtube-timestamped-summary/issues/new?template=bug_report.yml) — use the panel's *Copy details* button, never a raw log
+- 💡 [**Request a feature**](https://github.com/priyank1205/youtube-timestamped-summary/issues/new?template=feature_request.yml)
 - 📖 [**CONTRIBUTING.md**](CONTRIBUTING.md) — local setup, project layout, style, release process
 - 📋 [**CHANGELOG.md**](CHANGELOG.md) — what changed in every version
 

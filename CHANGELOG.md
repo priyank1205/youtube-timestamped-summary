@@ -2,7 +2,7 @@
 
 Notable changes to the extension. Version numbers match `manifest.json`, and
 every released version has an entry here and on the
-[Releases page](https://github.com/priyank1205/yt-transcript-ext/releases).
+[Releases page](https://github.com/priyank1205/youtube-timestamped-summary/releases).
 
 Write new entries under **Unreleased** as you go; `npm run bump` moves that
 section under the new version number when you release.

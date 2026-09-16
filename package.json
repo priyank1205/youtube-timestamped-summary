@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/priyank1205/yt-transcript-ext.git"
+    "url": "git+https://github.com/priyank1205/youtube-timestamped-summary.git"
   },
   "scripts": {
     "test": "node --test tests/*.test.cjs",
