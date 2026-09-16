@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.8.0 — 2026-09-16
+
 ### Added
 
 - **Statistics is a bloom.** One seed per summary, placed on a sunflower
