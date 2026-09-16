@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.9.0 — 2026-09-16
+
 ### Changed
 
 - **The Detail control shows you what you are choosing.** The slider is now a
