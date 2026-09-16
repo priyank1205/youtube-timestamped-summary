@@ -396,7 +396,7 @@ const WRITABLE_PANEL_PREFS = {
 async function panelPrefs() {
   const allProviders = await loadProviders();
   const storage = await chrome.storage.local.get([
-    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN',
+    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_GIST',
     ...Object.values(allProviders).map((p) => p.storageKey)
   ]);
   const providerReady = configuredProviderIds(allProviders, storage).length > 0;
@@ -404,6 +404,8 @@ async function panelPrefs() {
     summaryLength: storage.SUMMARY_LENGTH || 'standard',
     theme: storage.THEME_PREF || 'system',
     skin: storage.PANEL_SKIN || 'quiet',
+    // The overview line is always written; this only says whether to show it.
+    showGist: storage.SHOW_GIST !== false,
     // Whether generation is possible at all — the panel uses it to choose
     // between "Generate summary" and "Add API key".
     providerReady
@@ -443,7 +445,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // rest are the preferences the panel renders directly.
   const relevant = Object.keys(changes).some((key) =>
     key.endsWith('_API_KEY') || key === 'CUSTOM_PROVIDERS' ||
-    ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN'].includes(key));
+    ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_GIST'].includes(key));
   if (relevant) {
     broadcastPanelPrefs();
     refreshActionBadge();

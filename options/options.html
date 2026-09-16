@@ -19,22 +19,20 @@
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 44px 20px 60px;
+      display: block;
+      padding: 0;
     }
 
     /* Ambient glow */
     body::before {
       content: '';
       position: fixed;
-      top: -140px;
+      top: -220px;
       left: 50%;
       transform: translateX(-50%);
-      width: 420px;
-      height: 320px;
-      background: radial-gradient(circle, rgba(255, 0, 0, 0.07) 0%, transparent 70%);
+      width: 900px;
+      height: 460px;
+      background: radial-gradient(circle, rgba(255, 0, 0, 0.055) 0%, transparent 70%);
       pointer-events: none;
       z-index: 0;
     }
@@ -1958,6 +1956,660 @@
       .cp-resolve, .cp-subnote { grid-column: 1; }
     }
   </style>
+
+  <!-- ======================================================================
+       BEZEL — the settings surface.
+       One material rule: light comes from above. The rail is recessed into the
+       window, the content plane is raised against it, and anything you preview
+       or type into is cut back down into that plane. Sections sit directly on
+       the plane, divided by a rule — never stacked as cards inside cards.
+       ====================================================================== -->
+  <style>
+    .app {
+      --bz-ln:    #202026;
+      --bz-ln-s:  #1c1c22;
+      --bz-ln-f:  #17171c;
+      --bz-well:  #0a0a0c;
+      --bz-ink:   #ececef;
+      --bz-mid:   #9a9aa5;
+      --bz-faint: #74747e;
+      --bz-hot:   #e0705f;
+      --bz-ok:    #4ade80;
+
+      --bz-raise: inset 0 1px 0 rgba(255,255,255,0.055), 0 1px 2px rgba(0,0,0,0.6), 0 16px 34px -18px rgba(0,0,0,0.95);
+      --bz-ctl:   inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.45);
+      --bz-cut:   inset 0 0 0 1px #1e1e24, inset 0 2px 6px rgba(0,0,0,0.75);
+
+      width: 100%;
+      min-height: 100vh;
+      background: #0b0b0d;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    /* ---- rail: recessed below the window plane ---- */
+    .app .sidebar {
+      width: 236px; background: #070709; border-right: 0;
+      box-shadow: inset -8px 0 14px -12px #000, inset -1px 0 0 #16161a;
+      padding: 22px 12px 20px;
+    }
+    .app .brand { padding: 2px 10px 0; }
+    .app .brand-name { font-size: 12.5px; font-weight: 600; letter-spacing: -0.012em; }
+    .app .brand-ver { font-size: 11px; color: var(--bz-faint); }
+    /* The nav sits a fixed 40px under the wordmark; the rail's leftover height
+       falls below it, where an empty column reads as calm rather than unbalanced. */
+    .app .nav {
+      flex: 1; display: flex; flex-direction: column; justify-content: flex-start;
+      gap: 5px; padding: 40px 0 0;
+    }
+    .app .nav-item {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      font-size: 13.5px; font-weight: 450; color: #8d8d98;
+      background: none; border: 1px solid transparent; border-radius: 9px;
+      padding: 12px 12px; cursor: pointer; text-align: left;
+      transition: background .14s ease, color .14s ease, border-color .14s ease;
+    }
+    .app .nav-item svg { width: 15px; height: 15px; flex: 0 0 auto; opacity: 0.6; fill: none; stroke: currentColor; }
+    .app .nav-label { flex: 1; }
+    .app .nav-val { font-style: normal; font-size: 11px; color: #75757f; font-weight: 400; }
+    .app .nav-item:hover { color: #d4d4dc; background: rgba(255,255,255,0.03); }
+    .app .nav-item.active {
+      color: #fff; font-weight: 600;
+      background: linear-gradient(#242430, #1a1a23);
+      border-color: #30303c; box-shadow: var(--bz-ctl);
+    }
+    .app .nav-item.active::before { display: none; }
+    .app .nav-item.active svg { opacity: 1; color: var(--bz-hot); }
+    .app .nav-item.active .nav-val { color: #9a9aa6; }
+    .app .sidebar-foot { color: #5f5f69; font-size: 11px; padding: 14px 12px 0; border-top: 1px solid rgba(255,255,255,0.045); }
+
+    /* ---- the content plane: one raised surface, catching light on its left edge ---- */
+    .app .content {
+      padding: 0; background: linear-gradient(#141418, #0f0f12);
+      box-shadow: inset 1px 0 0 rgba(255,255,255,0.045);
+      display: flex; flex-direction: column;
+    }
+    .app .pane { display: none; flex: 1; min-height: 0; }
+    .app .pane.active { display: block; animation: fadeUp 0.34s cubic-bezier(0.16,1,0.3,1) both; }
+    .app .pane.active.split { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 468px); }
+    .pane-main { padding: 34px 40px 36px; min-width: 0; }
+    /* Full-bleed window, but text and controls keep a measure you can read. */
+    .pane-main > .pane-head, .pane-main > .sec { max-width: 620px; }
+    .app .pane:not(.split).active { padding: 34px 40px 36px; }
+    .app .pane:not(.split).active > .pane-head,
+    .app .pane:not(.split).active > .sec,
+    .app .pane:not(.split).active > .colophon { max-width: 720px; }
+    .app .pane-head { margin: 0 0 22px; }
+    .app .pane-title { font-size: 21px; font-weight: 650; letter-spacing: -0.024em; color: var(--bz-ink); }
+    .app .pane-sub { font-size: 12.75px; color: var(--bz-mid); line-height: 1.6; max-width: 64ch; margin-top: 5px; }
+
+    /* sections sit on the plane, divided by a rule */
+    .sec { padding: 22px 0 0; margin-top: 22px; border-top: 1px solid var(--bz-ln-f); }
+    .sec:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+    .bz-k {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--bz-faint); margin: 0 0 11px;
+    }
+    .bz-hint { margin: 13px 0 0; font-size: 11.5px; line-height: 1.65; color: var(--bz-faint); max-width: 68ch; }
+    .bz-para { margin: 0; font-size: 12.25px; line-height: 1.65; color: var(--bz-mid); max-width: 72ch; }
+
+    /* ---- option cards: selection is a lift and a ring, never a white slab ---- */
+    .bz-opts { display: grid; gap: 8px; }
+    .bz-opts.c3 { grid-template-columns: repeat(3, 1fr); }
+    .bz-opts.c2 { grid-template-columns: repeat(2, 1fr); max-width: 430px; }
+    .bz-o {
+      position: relative; text-align: left; font: inherit; cursor: pointer;
+      padding: 12px 13px 13px; border-radius: 10px;
+      background: #17171c; border: 1px solid #25252d;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+    .bz-o:hover { background: #1c1c22; border-color: #32323b; }
+    .bz-o b { display: block; font-size: 13px; font-weight: 600; color: #c8c8d2; letter-spacing: -0.008em; padding-right: 20px; }
+    .bz-o > span:not(.bz-thumb) { display: block; font-size: 11px; color: #7e7e88; line-height: 1.45; margin-top: 4px; }
+    .bz-o[aria-checked="true"] {
+      background: linear-gradient(#25252f, #1c1c24);
+      border-color: rgba(224,112,95,0.5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.09),
+                  0 0 0 3px rgba(224,112,95,0.11),
+                  0 6px 18px -8px rgba(0,0,0,0.9);
+    }
+    .bz-o[aria-checked="true"] b { color: #fff; }
+    .bz-o[aria-checked="true"] > span:not(.bz-thumb) { color: #a6a6b0; }
+    .bz-o[aria-checked="true"]::after {
+      content: ''; position: absolute; top: 11px; right: 11px;
+      width: 15px; height: 15px; border-radius: 50%;
+      background: var(--bz-hot) center/9px 9px no-repeat
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23140d0c' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4 4 10-10'/%3E%3C/svg%3E");
+      box-shadow: 0 1px 4px rgba(224,112,95,0.55);
+    }
+    .bz-o:has(.bz-thumb)[aria-checked="true"]::after { top: 9px; right: 9px; }
+
+    /* theme thumbnails: miniature panels, so the choice needs no label */
+    .bz-o .bz-thumb { display: flex; height: 44px; border-radius: 6px; overflow: hidden; box-shadow: var(--bz-cut); margin-bottom: 11px; }
+    .bz-o .bz-half { flex: 1; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; margin: 0; }
+    .bz-o .bz-half.dk { background: #0f0f0f; }
+    .bz-o .bz-half.lt { background: #f3f3f4; }
+    .bz-o .bz-half i { display: block; height: 3px; border-radius: 2px; width: 100%; }
+    .bz-o .bz-half.dk i { background: #2e2e2e; }
+    .bz-o .bz-half.dk i.hd { background: #565656; width: 52%; }
+    .bz-o .bz-half.lt i { background: #d6d6da; }
+    .bz-o .bz-half.lt i.hd { background: #9d9da4; width: 52%; }
+
+
+    /* design thumbnails: one mini panel each, drawn the way that skin draws */
+    .bz-o .bz-thumb.solo { display: block; height: 56px; padding: 0; }
+    .bz-o .bz-mini { display: flex; flex-direction: column; gap: 5px; height: 100%; padding: 9px 10px; background: #0f0f0f; }
+    .bz-o .bz-mini i { display: block; border-radius: 2px; }
+    .bz-o .bz-mini i.t { height: 5px; width: 46%; }
+    .bz-o .bz-mini i.r { height: 4px; width: 100%; background: #2c2c2c; }
+    .bz-o .bz-mini i.r.short { width: 68%; }
+    .bz-o .bz-mini.refined i.t { background: #d95a46; }
+    .bz-o .bz-mini.refined { gap: 7px; }
+    .bz-o .bz-mini.original i.t { background: linear-gradient(90deg, #ff2d2d, #ff8a3d); width: 70%; height: 7px; }
+    .bz-o .bz-mini.original i.r { background: #3a3a3a; }
+    .bz-o .bz-mini.original { gap: 4px; }
+
+    /* ---- switch ---- */
+    .bz-row { display: flex; align-items: flex-start; gap: 18px; }
+    .bz-row-t { flex: 1; min-width: 0; }
+    .bz-row-t b { display: block; font-size: 13.5px; font-weight: 600; color: var(--bz-ink); letter-spacing: -0.008em; }
+    .bz-row-t span { display: block; font-size: 11.5px; color: var(--bz-faint); margin-top: 3px; line-height: 1.55; max-width: 56ch; }
+    /* Off is a well cut into the plane; on is the same well lit from inside.
+       The accent carries "on" here exactly as it carries "chosen" on a card. */
+    .bz-sw {
+      width: 44px; height: 26px; border-radius: 13px; position: relative; flex: 0 0 auto;
+      margin-top: 1px; cursor: pointer; border: 0; padding: 0;
+      background: #131318; box-shadow: var(--bz-cut);
+      transition: background .2s ease, box-shadow .2s ease;
+    }
+    .bz-sw::after {
+      content: ''; position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%;
+      background: linear-gradient(#5a5a66, #42424d);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.14);
+      transition: left .22s cubic-bezier(0.16,1,0.3,1), background .2s ease;
+    }
+    .bz-sw[aria-checked="true"] {
+      background: linear-gradient(#d95a46, #b8402f);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),
+                  inset 0 -1px 2px rgba(0,0,0,0.3),
+                  0 0 0 3px rgba(224,112,95,0.12),
+                  0 3px 12px -4px rgba(224,112,95,0.55);
+    }
+    .bz-sw[aria-checked="true"]::after {
+      left: 22px;
+      background: linear-gradient(#fff, #f2eceb);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 #fff;
+    }
+    .bz-sw:hover { box-shadow: var(--bz-cut), 0 0 0 3px rgba(255,255,255,0.04); }
+    .bz-sw[aria-checked="true"]:hover {
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),
+                  0 0 0 3px rgba(224,112,95,0.2),
+                  0 3px 14px -4px rgba(224,112,95,0.7);
+    }
+
+    /* ---- preview column: a faithful miniature of the real panel -----------
+       Values below are lifted from styles/skin-quiet.css and styles/content.css
+       (surface, chip, divider, type sizes) so what you see here is what the
+       sidebar renders. Descriptions are collapsed in the real panel too — one
+       row is shown open, the way you would leave it after clicking. */
+    .pane-aside {
+      background: var(--bz-well); min-width: 0;
+      box-shadow: inset 1px 0 0 #1a1a20, inset 4px 0 10px -8px #000;
+      padding: 34px 28px 30px; display: flex; flex-direction: column;
+    }
+    .bz-prevwrap { max-width: 412px; }
+
+    .pv {
+      --s: #181818; --raised: #212121; --bd: rgba(255,255,255,0.09);
+      --dv: rgba(255,255,255,0.06); --chip: rgba(255,255,255,0.08);
+      --t1: #f1f1f1; --t2: #aaaaaa; --t3: #8a8a8a;
+      --acc: #cc0000; --acc-t: #ff5c5c; --acc-tint: rgba(255,70,70,0.12);
+      background: var(--s); border: 1px solid var(--bd); border-radius: 12px;
+      overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+      font-size: 13px;
+    }
+    .pv.lt {
+      --s: #ffffff; --raised: #fafafa; --bd: #e5e5e5; --dv: rgba(0,0,0,0.07);
+      --chip: rgba(0,0,0,0.05); --t1: #0f0f0f; --t2: #606060; --t3: #909090;
+      --acc-t: #cc0000; --acc-tint: rgba(204,0,0,0.07);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .pv-head { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-bottom: 1px solid var(--dv); }
+    .pv-head b { font-size: 13px; font-weight: 500; color: var(--t1); }
+    .pv-chip {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 500; color: var(--t2);
+      background: var(--chip); border-radius: 20px; padding: 4px 9px;
+    }
+    .pv-chip i { font-style: normal; font-size: 8px; opacity: 0.8; }
+
+    /* the gist card, exactly as .yt-brief draws it */
+    .pv-gist { padding: 12px 12px 14px; border-bottom: 1px solid var(--dv); }
+    .pv-brief { background: var(--raised); border: 1px solid var(--bd); border-radius: 10px; padding: 13px 14px 11px; }
+    .pv-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.7px; color: var(--t3); margin: 0 0 8px; }
+    .pv-text { font-size: 13px; line-height: 1.6; color: var(--t1); margin: 0; }
+    .pv-rail { display: flex; gap: 12px; margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--dv); font-size: 11px; color: var(--t3); }
+    .pv-rail b { color: var(--t2); font-weight: 500; }
+
+    .pv-sec { font-size: 11px; font-weight: 500; color: var(--t3); letter-spacing: 0.7px; padding: 18px 16px 6px; }
+    .pv-row { display: flex; align-items: center; gap: 0; padding: 12px 16px; }
+    .pv-time {
+      font-size: 12px; font-weight: 500; color: var(--t2); background: var(--chip);
+      padding: 3px 9px; border-radius: 16px; margin-right: 12px; min-width: 50px;
+      text-align: center; font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .pv-row.open .pv-time { background: var(--acc-tint); color: var(--acc-t); }
+    .pv-t { font-size: 14px; font-weight: 400; color: var(--t1); line-height: 1.35; flex: 1; min-width: 0; }
+    .pv-row.open .pv-t { font-weight: 500; }
+    .pv-chev { flex: 0 0 auto; width: 7px; height: 7px; margin: 0 4px 0 10px;
+      border-right: 1.6px solid var(--t3); border-bottom: 1.6px solid var(--t3);
+      transform: rotate(45deg); }
+    .pv-row.open .pv-chev { transform: rotate(-135deg); border-color: var(--t1); }
+    .pv-desc {
+      font-size: 13px; line-height: 1.55; color: var(--t2);
+      margin: -4px 16px 6px 16px; padding: 2px 0 8px 12px; border-left: 2px solid var(--dv);
+    }
+    .pv-more { padding: 10px 16px 13px; font-size: 11px; color: var(--t3); border-top: 1px solid var(--dv); }
+
+    /* Original skin — values from styles/content.css: rows #1a1a1a on #333 at
+       8px with 4px gaps, the red time pill, a section header that is 12px/700
+       white at half opacity over a #333 rule, and the overview card carrying
+       the runtime, the actions and the detail chip rather than the header. */
+    .pv.classic { --s: #0f0f0f; --bd: #333; }
+    .pv.classic .pv-head {
+      padding: 13px 14px; border-bottom: 2px solid #cc0000; gap: 10px;
+    }
+    .pv.classic .pv-head b { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .pv-startover { display: none; }
+    .pv.classic .pv-startover {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; color: #aaa;
+    }
+    .pv.classic .pv-startover .pv-undo {
+      width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 50%;
+      border-right-color: transparent; transform: rotate(-45deg); display: block;
+    }
+    .pv-collapse { display: none; }
+    .pv.classic .pv-collapse {
+      display: block; margin-left: auto; width: 8px; height: 8px;
+      border-left: 1.6px solid #aaa; border-top: 1.6px solid #aaa;
+      transform: rotate(45deg); margin-top: 3px;
+    }
+
+    .pv.classic .pv-gist { padding: 12px 12px 4px; border-bottom: 0; }
+    .pv.classic .pv-brief { background: #1a1a1a; border-color: #333; border-radius: 10px; padding: 12px 13px 11px; }
+    .pv.classic .pv-eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+      text-transform: uppercase; color: #8a8a8a; margin-bottom: 6px;
+    }
+    .pv.classic .pv-text { font-size: 13px; line-height: 1.55; color: #e8e8e8; }
+    .pv.classic .pv-rail {
+      gap: 2px 14px; margin-top: 11px; padding-top: 10px;
+      border-top: 1px solid #333; font-size: 11.5px; color: #8a8a8a;
+    }
+    .pv.classic .pv-rail b { color: #c4bebe; font-weight: 500; }
+    .pv-acts { display: none; }
+    .pv.classic .pv-acts {
+      display: flex; align-items: center; gap: 7px; margin-top: 9px;
+    }
+    .pv.classic .pv-link { font-size: 12px; color: #aaa; cursor: pointer; }
+    .pv.classic .pv-link:hover { color: #fff; }
+    .pv.classic .pv-dot { color: #5a5a5a; font-size: 12px; }
+    .pv.classic .pv-acts .pv-chip {
+      margin-left: auto; font-size: 12px; color: #f1f1f1;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px; padding: 3px 9px;
+    }
+
+    .pv.classic .pv-sec {
+      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 8px 0; margin: 12px 12px 0; border-bottom: 1px solid #333;
+    }
+
+    .pv.classic .pv-body { padding: 4px 12px 10px; }
+    .pv.classic .pv-row {
+      background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
+      padding: 10px 14px; margin: 4px 0;
+    }
+    .pv.classic .pv-row.open { border-color: #cc0000; }
+    .pv.classic .pv-time {
+      font-size: 12px; font-weight: 700; color: #FF0033;
+      background: rgba(255,0,51,0.2); border-radius: 16px;
+      padding: 4px 8px; margin-right: 8px; min-width: 0;
+    }
+    .pv.classic .pv-t { font-size: 14px; font-weight: 500; color: #fff; }
+    .pv.classic .pv-chev { display: none; }
+    .pv-plus { display: none; }
+    .pv.classic .pv-plus {
+      display: block; flex: 0 0 auto; color: #888; font-size: 16px;
+      line-height: 1; margin-left: 10px;
+    }
+    .pv.classic .pv-desc {
+      margin: 0 0 6px; padding: 10px 13px; border-left: 0;
+      background: #151515; border: 1px solid #2a2a2a; border-radius: 8px;
+      font-size: 12.5px; color: #b8b8b8;
+    }
+    .pv.classic .pv-more { border-top: 1px solid #333; margin: 0 12px; padding: 10px 0 12px; }
+
+    /* Original in light: its own palette, from content.css's yt-theme-light
+       block. Without this the classic surfaces stay dark while the type tokens
+       go light, and the rows render as unreadable dark-on-dark. */
+    .pv.classic.lt { --s: #ffffff; --bd: #e5e5e5; }
+    .pv.classic.lt .pv-head b { color: #0f0f0f; }
+    .pv.classic.lt .pv-startover, .pv.classic.lt .pv-link { color: #606060; }
+    .pv.classic.lt .pv-collapse { border-color: #606060; }
+    .pv.classic.lt .pv-brief { background: #fafafa; border-color: #e5e5e5; }
+    .pv.classic.lt .pv-text { color: #0f0f0f; }
+    .pv.classic.lt .pv-rail { border-top-color: #e5e5e5; color: #909090; }
+    .pv.classic.lt .pv-rail b { color: #3f3f3f; }
+    .pv.classic.lt .pv-sec { color: rgba(0,0,0,0.45); border-bottom-color: #e0e0e0; }
+    .pv.classic.lt .pv-row { background: #fbfbfb; border-color: #e0e0e0; }
+    .pv.classic.lt .pv-row.open { border-color: #cc0000; }
+    .pv.classic.lt .pv-time { color: #FF0033; background: rgba(255,0,51,0.08); }
+    .pv.classic.lt .pv-t { color: #525151; }
+    .pv.classic.lt .pv-row.open .pv-t { color: #0f0f0f; }
+    .pv.classic.lt .pv-desc { background: #fafafa; border-color: #e8e8e8; color: #5a5a5a; }
+    .pv.classic.lt .pv-acts .pv-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); color: #0f0f0f; }
+    .pv.classic.lt .pv-plus { color: #9a9a9a; }
+    .pv.classic.lt .pv-more { border-top-color: #e5e5e5; }
+
+    .bz-cap { margin-top: auto; padding-top: 18px; max-width: 412px; font-size: 11.5px; color: var(--bz-faint); line-height: 1.55; }
+    .bz-cap b { color: var(--bz-mid); font-weight: 600; }
+
+    /* ---- statistics: one dot per summary ---- */
+    .stat-hero { display: flex; align-items: center; gap: 28px; }
+    .stat-figure { flex: 0 0 auto; display: flex; align-items: baseline; gap: 12px; }
+    .stat-num {
+      font-size: 64px; font-weight: 300; letter-spacing: -0.05em; line-height: 0.9;
+      color: #fff; font-variant-numeric: tabular-nums;
+    }
+    .stat-cap { font-size: 12px; line-height: 1.35; color: var(--bz-faint); }
+    /* Capped so the dots wrap into a block you can actually count, rather
+       than stretching into a dashed line across a wide window. */
+    .stat-dots {
+      flex: 0 1 auto; max-width: 430px; display: flex; flex-wrap: wrap; gap: 6px;
+      align-content: center; min-height: 62px; padding-left: 28px;
+      border-left: 1px solid var(--bz-ln-f);
+    }
+    .stat-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--bz-hot); display: block;
+      box-shadow: 0 0 6px rgba(224,112,95,0.45);
+      animation: dotIn .4s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .stat-dot.ghost { background: #232329; box-shadow: none; }
+    .stat-more { font-size: 11px; color: var(--bz-faint); align-self: center; margin-left: 4px; }
+    @keyframes dotIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .stat-dot { animation: none; } }
+    .stat-empty { margin: 16px 0 0; font-size: 12px; color: var(--bz-faint); }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--bz-ln-s); border-radius: 10px; overflow: hidden; box-shadow: var(--bz-cut); }
+    .stat-cell { background: var(--bz-well); padding: 16px 16px 15px; }
+    .stat-val {
+      display: block; font-size: 24px; font-weight: 500; letter-spacing: -0.03em;
+      color: var(--bz-ink); font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .stat-lab { display: block; font-size: 11.5px; color: var(--bz-faint); margin-top: 6px; line-height: 1.45; }
+
+    /* ---- about: the ledger and the colophon ---- */
+    .bz-flow { display: grid; gap: 1px; background: var(--bz-ln-s); border-radius: 10px; overflow: hidden; box-shadow: var(--bz-cut); }
+    .bz-fl { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 14px; padding: 12px 15px; background: var(--bz-well); }
+    .bz-fl svg { width: 16px; height: 16px; color: #7a7a84; }
+    .bz-fl b { display: block; font-size: 12.5px; font-weight: 600; color: var(--bz-ink); }
+    .bz-fl span { display: block; font-size: 11px; color: var(--bz-faint); margin-top: 2px; }
+    .bz-fl .dest { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--bz-mid); white-space: nowrap; }
+    .bz-fl .dest.none { color: #5f5f68; }
+    .bz-hosts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .bz-host {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px; color: var(--bz-mid); background: var(--bz-well);
+      box-shadow: var(--bz-cut); border-radius: 6px; padding: 5px 9px;
+    }
+    .colophon {
+      display: flex; align-items: center; gap: 14px;
+      margin-top: 26px; padding: 16px 18px; border-radius: 12px;
+      background: linear-gradient(#1a1a20, #141419);
+      border: 1px solid var(--bz-ln); box-shadow: var(--bz-ctl);
+    }
+    .colophon-mark { width: 34px; height: 34px; border-radius: 10px; overflow: hidden; flex: 0 0 auto; box-shadow: 0 2px 6px -1px rgba(0,0,0,0.7); }
+    .colophon-mark img { width: 100%; height: 100%; display: block; }
+    .colophon-t { flex: 1; min-width: 0; }
+    .colophon-t b { display: block; font-size: 13px; font-weight: 650; color: var(--bz-ink); letter-spacing: -0.01em; }
+    /* Direct child only: the line holds a nested <span> for the heart, and a
+       descendant selector would turn that into a block and break the line. */
+    .colophon-t > span { display: block; font-size: 11.5px; color: var(--bz-faint); margin-top: 3px; }
+    .colophon-t .heart { display: inline; color: var(--bz-hot); }
+    .colophon-btn {
+      display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
+      font-size: 12.5px; font-weight: 600; color: #ededf2; text-decoration: none;
+      background: linear-gradient(#26262e, #1c1c23); border: 1px solid #33333d;
+      border-radius: 8px; padding: 9px 14px; box-shadow: var(--bz-ctl);
+      transition: background .14s ease;
+    }
+    .colophon-btn:hover { background: linear-gradient(#2c2c35, #212129); }
+    .colophon-btn svg { width: 15px; height: 15px; }
+
+    @media (max-width: 1000px) {
+      .app .pane.active.split { grid-template-columns: 1fr; }
+      .pane-aside { box-shadow: inset 0 1px 0 #1a1a20; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .stat-hero { flex-direction: column; align-items: flex-start; gap: 18px; }
+      .stat-dots { padding-left: 0; border-left: 0; width: 100%; }
+    }
+    @media (max-width: 680px) { .bz-opts.c3 { grid-template-columns: 1fr; } }
+  </style>
+
+  <!-- ======================================================================
+       Your AI — the provider card.
+       A connected provider is a settled object: a mark, its name, the key it
+       is using, and the model it will call. The form to change any of that is
+       a drawer underneath, not the resting state.
+       ====================================================================== -->
+  <style>
+    #pane-ai .info-banner, #pane-ai .model-card,
+    #pane-ai .add-provider, #pane-ai .setting-section,
+    #pane-ai .privacy-note, #pane-ai .ai-label { max-width: 580px; }
+
+    /* a quiet section label instead of a green alert bar */
+    #pane-ai .info-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: none; border: 0; box-shadow: none;
+      border-radius: 0; padding: 0; margin: 0 0 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--bz-faint);
+    }
+    #pane-ai .info-banner p {
+      margin: 0; font: inherit; color: inherit;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #pane-ai .info-banner strong { color: var(--bz-mid); font-weight: 600; }
+    #pane-ai .banner-icon { flex: 0 0 auto; display: grid; place-items: center; color: var(--bz-ok); }
+    #pane-ai .banner-icon svg { width: 13px; height: 13px; }
+
+    /* ---- the card ---- */
+    #pane-ai .model-card {
+      background: linear-gradient(#1a1a20, #141419);
+      border: 1px solid #26262e; border-radius: 14px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.045), 0 1px 2px rgba(0,0,0,0.5), 0 14px 30px -20px rgba(0,0,0,0.9);
+      padding: 0; margin-bottom: 10px; overflow: hidden;
+    }
+    #pane-ai .card-header { display: flex; align-items: center; gap: 14px; padding: 17px 18px; margin: 0; border: 0; }
+
+    #pane-ai .model-icon {
+      width: 40px; height: 40px; border-radius: 12px; flex: 0 0 auto;
+      display: grid; place-items: center; color: #f0f0f4;
+      background: linear-gradient(#26262f, #1b1b22);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 6px -2px rgba(0,0,0,0.7);
+    }
+    #pane-ai .model-icon svg { width: 19px; height: 19px; }
+    #pane-ai .model-info { min-width: 0; flex: 1; }
+    #pane-ai .model-name { font-size: 15px; font-weight: 650; letter-spacing: -0.014em; color: #fbfbfd; line-height: 1.3; }
+    #pane-ai .model-desc {
+      font-size: 11.5px; color: var(--bz-faint); margin-top: 3px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #pane-ai .model-desc.is-key {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11.5px; letter-spacing: 0.06em; color: var(--bz-mid);
+    }
+
+    /* status as a pill, so "connected" is an object and not stray green text */
+    #pane-ai .status-badge {
+      flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
+      font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none;
+      border-radius: 20px; padding: 5px 11px 5px 9px;
+    }
+    #pane-ai .status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+    #pane-ai .status-badge.configured {
+      color: #6ee7a0; background: rgba(74,222,128,0.1); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.22);
+    }
+    #pane-ai .status-badge.configured::before { background: var(--bz-ok); box-shadow: 0 0 6px rgba(74,222,128,0.8); }
+    #pane-ai .status-badge.invalid {
+      color: #eda292; background: rgba(224,112,95,0.1); box-shadow: inset 0 0 0 1px rgba(224,112,95,0.28);
+    }
+    #pane-ai .status-badge.invalid::before { background: var(--bz-hot); box-shadow: 0 0 6px rgba(224,112,95,0.7); }
+    #pane-ai .status-badge.not-configured { color: var(--bz-faint); background: rgba(255,255,255,0.04); }
+    #pane-ai .status-badge.not-configured::before { background: #3c3c44; }
+
+    #pane-ai .card-edit {
+      flex: 0 0 auto; font: inherit; font-size: 12.5px; font-weight: 600; color: #ededf2;
+      background: linear-gradient(#2a2a33, #1f1f27); border: 1px solid #383843;
+      border-radius: 9px; padding: 8px 14px; cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.45);
+      transition: background .14s ease, border-color .14s ease;
+    }
+    #pane-ai .card-edit:hover { background: linear-gradient(#31313c, #24242d); border-color: #45454f; }
+    #pane-ai .delete-custom-btn {
+      flex: 0 0 auto; background: none; border: 0; color: #5f5f68; cursor: pointer;
+      padding: 7px; border-radius: 8px; display: grid; place-items: center;
+    }
+    #pane-ai .delete-custom-btn:hover { color: var(--bz-hot); background: rgba(224,112,95,0.1); }
+    #pane-ai .delete-custom-btn svg { width: 15px; height: 15px; }
+
+    /* ---- model row: a real field, label above the control ---- */
+    #pane-ai .card-model {
+      padding: 0 18px 17px; margin-top: -2px;
+      display: block; border: 0;
+    }
+    #pane-ai .card-model > span {
+      display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--bz-faint); margin-bottom: 8px;
+    }
+    #pane-ai .card-model select, #pane-ai .input-wrapper select {
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; background-size: 15px;
+      padding-right: 36px;
+    }
+    #pane-ai .card-model select {
+      width: 100%; height: 40px; border: 0; border-radius: 10px;
+      background-color: #0c0c0f; box-shadow: var(--bz-cut);
+      color: var(--bz-ink); font: inherit; font-size: 13.5px; font-weight: 550;
+      padding-left: 13px; outline: none; cursor: pointer;
+      transition: box-shadow .14s ease;
+    }
+    #pane-ai .card-model select:hover { box-shadow: var(--bz-cut), 0 0 0 3px rgba(255,255,255,0.03); }
+    #pane-ai .card-model select:focus {
+      box-shadow: inset 0 0 0 1px #4a4a56, inset 0 2px 6px rgba(0,0,0,0.75), 0 0 0 3px rgba(255,255,255,0.06);
+    }
+    #pane-ai .card-model[hidden] { display: none; }
+
+    /* ---- the drawer: only open while you are changing something ---- */
+    #pane-ai .card-body { padding: 16px 18px 17px; border-top: 1px solid var(--bz-ln-f); background: rgba(0,0,0,0.18); }
+    #pane-ai .card-body[hidden] { display: none; }
+    #pane-ai .input-group { margin-bottom: 14px; }
+    #pane-ai .input-group label {
+      display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--bz-faint); margin-bottom: 8px;
+    }
+    #pane-ai .input-wrapper { position: relative; }
+    #pane-ai .input-wrapper input, #pane-ai .input-wrapper select {
+      width: 100%; height: 40px; border: 0; border-radius: 10px;
+      background-color: #0c0c0f; box-shadow: var(--bz-cut); color: var(--bz-ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+      letter-spacing: 0.02em; padding: 0 42px 0 13px; outline: none; transition: box-shadow .14s ease;
+    }
+    #pane-ai .input-wrapper select { font-family: inherit; font-size: 13.5px; font-weight: 550; letter-spacing: 0; cursor: pointer; }
+    #pane-ai .input-wrapper input::placeholder { color: #6a6a74; }
+    #pane-ai .input-wrapper input:focus, #pane-ai .input-wrapper select:focus {
+      box-shadow: inset 0 0 0 1px #4a4a56, inset 0 2px 6px rgba(0,0,0,0.75), 0 0 0 3px rgba(255,255,255,0.06);
+    }
+    #pane-ai .input-wrapper input.invalid { box-shadow: inset 0 0 0 1px rgba(224,112,95,0.55), inset 0 2px 6px rgba(0,0,0,0.75); }
+    #pane-ai .toggle-visibility {
+      position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+      background: none; border: 0; padding: 7px; cursor: pointer; color: #7a7a84;
+      display: grid; place-items: center; border-radius: 7px;
+    }
+    #pane-ai .toggle-visibility:hover { color: var(--bz-ink); background: rgba(255,255,255,0.05); }
+    #pane-ai .toggle-visibility svg { width: 15px; height: 15px; }
+    #pane-ai .key-hint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--bz-faint); margin: -6px 0 13px; }
+    #pane-ai .action-row { display: flex; align-items: center; gap: 9px; }
+    #pane-ai .save-btn {
+      font: inherit; font-size: 12.5px; font-weight: 650; color: #17100e; cursor: pointer;
+      background: linear-gradient(#ef8877, #d9604d); border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 9px; padding: 9px 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 2px 12px -3px rgba(224,112,95,0.55);
+    }
+    #pane-ai .save-btn:disabled { opacity: 0.55; cursor: default; }
+    #pane-ai .save-btn svg { width: 14px; height: 14px; }
+    #pane-ai .remove-btn {
+      font: inherit; font-size: 12.5px; font-weight: 600; color: #e08878; cursor: pointer;
+      background: none; border: 1px solid #3a2725; border-radius: 9px; padding: 9px 15px;
+    }
+    #pane-ai .remove-btn:hover { background: rgba(224,112,95,0.09); border-color: #54332e; }
+    #pane-ai .help { margin-top: 15px; border-top: 1px solid var(--bz-ln-f); padding-top: 13px; }
+    #pane-ai .help-toggle {
+      display: flex; align-items: center; justify-content: space-between; width: 100%;
+      font: inherit; font-size: 12px; font-weight: 550; color: var(--bz-mid);
+      background: none; border: 0; padding: 4px 0; cursor: pointer;
+    }
+    #pane-ai .help-toggle:hover { color: var(--bz-ink); }
+    #pane-ai .help-toggle svg { width: 14px; height: 14px; }
+    #pane-ai .help-steps { margin: 10px 0 0 16px; font-size: 12px; color: var(--bz-mid); line-height: 1.75; }
+
+    /* ---- add another ---- */
+    #pane-ai .add-provider {
+      display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%;
+      font: inherit; font-size: 13px; font-weight: 600; color: #82828d;
+      background: none; border: 1px dashed #2e2e37; border-radius: 14px; padding: 16px; cursor: pointer;
+      transition: border-color .14s ease, color .14s ease, background .14s ease;
+    }
+    #pane-ai .add-provider:hover { border-color: #41414d; color: #d4d4dc; background: rgba(255,255,255,0.022); }
+    #pane-ai .add-provider svg { width: 16px; height: 16px; }
+
+    #pane-ai .setting-section { background: none; border: 0; padding: 0; margin: 22px 0 0; }
+    #pane-ai .setting-header { margin-bottom: 10px; }
+    #pane-ai .setting-title {
+      display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--bz-faint);
+    }
+    #pane-ai .setting-sub { display: block; font-size: 11.5px; color: var(--bz-faint); margin-top: 6px; line-height: 1.55; }
+    #pane-ai .selector-btn {
+      display: flex; align-items: center; justify-content: space-between; width: 100%;
+      font: inherit; font-size: 13.5px; font-weight: 550; color: #ededf2; cursor: pointer;
+      background: linear-gradient(#1a1a20, #141419); border: 1px solid #26262e; border-radius: 11px;
+      padding: 13px 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    #pane-ai .selector-btn:hover { border-color: #33333d; }
+    #pane-ai .selector-btn svg { width: 15px; height: 15px; }
+    #pane-ai .selector-btn-content { display: flex; align-items: center; gap: 10px; }
+    #pane-ai .selector-btn-icon { display: grid; place-items: center; color: var(--bz-hot); }
+    #pane-ai .selector-btn-icon svg { width: 16px; height: 16px; }
+
+    #pane-ai .privacy-note {
+      display: block; position: relative;
+      font-size: 11.5px; line-height: 1.7; color: var(--bz-faint);
+      background: none; border: 0; padding: 20px 0 0 26px; margin-top: 24px;
+      border-top: 1px solid var(--bz-ln-f);
+    }
+    #pane-ai .privacy-note svg { position: absolute; left: 0; top: 23px; width: 14px; height: 14px; opacity: 0.6; }
+    #pane-ai .privacy-note strong { color: var(--bz-mid); font-weight: 650; }
+  </style>
 </head>
 <body>
 
@@ -2191,38 +2843,146 @@
       <div class="brand">
         <img src="../icons/icon128.png" alt="Extension icon">
         <div>
-          <div class="brand-name">Transcript Extractor</div>
+          <div class="brand-name">Timestamped Summary</div>
           <div class="brand-ver">Settings</div>
         </div>
       </div>
       <nav class="nav" id="nav">
-        <button class="nav-item active" data-pane="providers" role="tab" aria-selected="true">
-          <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
-          AI providers
+        <button class="nav-item active" data-pane="summaries" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M4 12h11M4 18h7"/></svg>
+          <span class="nav-label">Summaries</span>
+          <em class="nav-val" id="nav-val-detail">Standard</em>
         </button>
-        <button class="nav-item" data-pane="appearance" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-          Appearance
+        <button class="nav-item" data-pane="panel" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
+          <span class="nav-label">Panel</span>
+          <em class="nav-val" id="nav-val-theme">Auto</em>
+        </button>
+        <button class="nav-item" data-pane="ai" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2m0-12-2 2M8 16l-2 2"/></svg>
+          <span class="nav-label">Your AI</span>
+          <em class="nav-val" id="nav-val-ai"></em>
         </button>
         <button class="nav-item" data-pane="stats" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24"><path d="M4 9h4v11H4V9zm6-5h4v16h-4V4zm6 8h4v8h-4v-8z"/></svg>
-          Statistics
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 19V11M12 19V5M19 19v-5"/></svg>
+          <span class="nav-label">Statistics</span>
+          <em class="nav-val" id="nav-val-stats"></em>
         </button>
         <button class="nav-item" data-pane="about" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-          About &amp; help
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+          <span class="nav-label">About</span>
         </button>
       </nav>
-      <div class="sidebar-foot">YouTube Transcript Extractor v1.2</div>
+      <div class="sidebar-foot">Version 1.4.0</div>
     </aside>
 
     <!-- Content -->
     <main class="content">
-      <!-- AI providers pane -->
-      <section class="pane active" id="pane-providers" role="tabpanel">
+      <!-- Summaries pane -->
+      <section class="pane split active" id="pane-summaries" role="tabpanel">
+        <div class="pane-main">
+          <div class="pane-head">
+            <div class="pane-title">Summaries</div>
+            <div class="pane-sub">How every new summary comes out. You can still change it on any video, from the panel.</div>
+          </div>
+
+          <div class="sec">
+            <p class="bz-k">Detail</p>
+            <div class="bz-opts c3" id="detail-options" role="radiogroup" aria-label="Detail">
+              <button type="button" class="bz-o" role="radio" data-detail="brief" data-label="Brief" aria-checked="false">
+                <b>Brief</b><span>Major sections only &mdash; a quick skim</span>
+              </button>
+              <button type="button" class="bz-o" role="radio" data-detail="standard" data-label="Standard" aria-checked="true">
+                <b>Standard</b><span>Balanced coverage &mdash; the best default</span>
+              </button>
+              <button type="button" class="bz-o" role="radio" data-detail="detailed" data-label="In-depth" aria-checked="false">
+                <b>In-depth</b><span>Every topic, with concrete specifics</span>
+              </button>
+            </div>
+            <p class="bz-hint" id="detail-effect"></p>
+          </div>
+
+          <div class="sec">
+            <div class="bz-row">
+              <div class="bz-row-t">
+                <b>Open with a gist</b>
+                <span>Two or three sentences saying what the video is about, above the timestamps.</span>
+              </div>
+              <button type="button" class="bz-sw" id="gist-toggle" role="switch" aria-checked="true" aria-label="Open with a gist"></button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="pane-aside">
+          <p class="bz-k">Preview</p>
+          <div class="bz-prevwrap" id="preview-summaries"></div>
+          <p class="bz-cap" id="preview-cap-summaries"></p>
+        </aside>
+      </section>
+
+      <!-- Panel pane -->
+      <section class="pane split" id="pane-panel" role="tabpanel">
+        <div class="pane-main">
+          <div class="pane-head">
+            <div class="pane-title">Panel</div>
+            <div class="pane-sub">How the summary panel looks inside YouTube.</div>
+          </div>
+
+          <div class="sec">
+            <p class="bz-k">Theme</p>
+            <div class="bz-opts c3" id="theme-options" role="radiogroup" aria-label="Panel theme">
+              <button type="button" class="bz-o" role="radio" data-theme="system" data-label="Auto" aria-checked="true">
+                <span class="bz-thumb" aria-hidden="true"><span class="bz-half lt"><i class="hd"></i><i></i><i></i></span><span class="bz-half dk"><i class="hd"></i><i></i><i></i></span></span>
+                <b>Auto</b><span>Follows YouTube</span>
+              </button>
+              <button type="button" class="bz-o" role="radio" data-theme="light" data-label="Light" aria-checked="false">
+                <span class="bz-thumb" aria-hidden="true"><span class="bz-half lt"><i class="hd"></i><i></i><i></i></span><span class="bz-half lt"><i></i><i></i><i></i></span></span>
+                <b>Light</b><span>Always light</span>
+              </button>
+              <button type="button" class="bz-o" role="radio" data-theme="dark" data-label="Dark" aria-checked="false">
+                <span class="bz-thumb" aria-hidden="true"><span class="bz-half dk"><i class="hd"></i><i></i><i></i></span><span class="bz-half dk"><i></i><i></i><i></i></span></span>
+                <b>Dark</b><span>Always dark</span>
+              </button>
+            </div>
+            <p class="bz-hint">Auto matches whatever theme YouTube is in, and follows it when you switch.</p>
+          </div>
+
+          <div class="sec">
+            <p class="bz-k">Design</p>
+            <div class="bz-opts c2" id="skin-options" role="radiogroup" aria-label="Panel design">
+              <button type="button" class="bz-o" role="radio" data-skin="quiet" data-label="Refined" aria-checked="true">
+                <span class="bz-thumb solo" aria-hidden="true">
+                  <span class="bz-mini refined">
+                    <i class="t"></i><i class="r"></i><i class="r short"></i><i class="r"></i>
+                  </span>
+                </span>
+                <b>Refined</b><span>One accent colour, more space between things</span>
+              </button>
+              <button type="button" class="bz-o" role="radio" data-skin="classic" data-label="Original" aria-checked="false">
+                <span class="bz-thumb solo" aria-hidden="true">
+                  <span class="bz-mini original">
+                    <i class="t"></i><i class="r"></i><i class="r short"></i><i class="r"></i>
+                  </span>
+                </span>
+                <b>Original</b><span>The first design &mdash; more colour, more motion</span>
+              </button>
+            </div>
+            <p class="bz-hint">Refined is the current design. Original is kept for anyone who preferred it, and both show the same summary.</p>
+          </div>
+        </div>
+
+        <aside class="pane-aside">
+          <p class="bz-k">Preview</p>
+          <div class="bz-prevwrap" id="preview-panel"></div>
+          <p class="bz-cap" id="preview-cap-panel"></p>
+        </aside>
+      </section>
+
+      <!-- Your AI pane -->
+      <section class="pane" id="pane-ai" role="tabpanel">
         <div class="pane-head">
-          <div class="pane-title">AI providers</div>
-          <div class="pane-sub">Connect the AI services that write your summaries.</div>
+          <div class="pane-title">Your AI</div>
+          <div class="pane-sub">The extension reads a video&rsquo;s captions. An AI of your choosing writes the summary from them.</div>
         </div>
 
         <div class="info-banner" id="intro-banner">
@@ -2327,107 +3087,100 @@
         </p>
       </section>
 
-      <!-- Appearance pane -->
-      <section class="pane" id="pane-appearance" role="tabpanel">
-        <div class="pane-head">
-          <div class="pane-title">Appearance</div>
-          <div class="pane-sub">How the summary panel fits into YouTube.</div>
-        </div>
-
-        <div class="setting-section">
-          <div class="setting-header">
-            <span class="setting-title">Panel theme</span>
-            <span class="setting-sub">System follows YouTube's current theme automatically</span>
-          </div>
-          <div class="segmented" id="theme-segmented" role="radiogroup" aria-label="Panel appearance">
-            <button class="segmented-option" data-theme="system" role="radio" aria-checked="true">System</button>
-            <button class="segmented-option" data-theme="light" role="radio" aria-checked="false">Light</button>
-            <button class="segmented-option" data-theme="dark" role="radio" aria-checked="false">Dark</button>
-          </div>
-        </div>
-
-        <div class="setting-section">
-          <div class="setting-header">
-            <span class="setting-title">Panel design</span>
-            <span class="setting-sub">Preview the redesigned panel before it becomes the default</span>
-          </div>
-          <div class="segmented" id="skin-segmented" role="radiogroup" aria-label="Panel design">
-            <button class="segmented-option" data-skin="classic" role="radio" aria-checked="false">Classic</button>
-            <button class="segmented-option" data-skin="quiet" role="radio" aria-checked="true">Quiet (new)</button>
-          </div>
-        </div>
-      </section>
-
       <!-- Statistics pane -->
       <section class="pane" id="pane-stats" role="tabpanel">
         <div class="pane-head">
           <div class="pane-title">Statistics</div>
-          <div class="pane-sub">Your impact so far.</div>
+          <div class="pane-sub">Counted on this computer, and kept here. One dot per summary.</div>
         </div>
 
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-value" id="stat-summaries">0</div>
-            <div class="stat-label">Summaries generated</div>
+        <div class="sec">
+          <div class="stat-hero">
+            <div class="stat-figure">
+              <span class="stat-num" id="stat-summaries">0</span>
+              <span class="stat-cap">summaries<br>generated</span>
+            </div>
+            <div class="stat-dots" id="stat-dots" aria-hidden="true"></div>
           </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-time-saved">0m</div>
-            <div class="stat-label">
-              Est. time saved
-              <span class="info-btn" tabindex="0" role="button" aria-label="How time saved is calculated">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                <span class="info-tip" role="tooltip">Estimated as the video's length minus the time to read your summary (about 200 words a minute), so it never drops below zero.</span>
-              </span>
+          <p class="stat-empty" id="stat-empty" hidden>No summaries yet. The first one fills the first dot.</p>
+        </div>
+
+        <div class="sec">
+          <div class="stat-grid">
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-time-saved">0m</span>
+              <span class="stat-lab">of watching saved</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-avg">&mdash;</span>
+              <span class="stat-lab">saved per summary, on average</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-longest">&mdash;</span>
+              <span class="stat-lab">two-hour films, roughly</span>
             </div>
           </div>
+          <p class="bz-hint">Time saved is an estimate: each video&rsquo;s length minus how long its summary takes to read, at about 200 words a minute. It never counts below zero, and it is arithmetic on your own counter rather than a measurement of you.</p>
         </div>
       </section>
 
-      <!-- About & help pane -->
+      <!-- About pane -->
       <section class="pane" id="pane-about" role="tabpanel">
         <div class="pane-head">
-          <div class="pane-title">About &amp; help</div>
-          <div class="pane-sub">What this extension does, and how to reach me.</div>
+          <div class="pane-title">About</div>
+          <div class="pane-sub">There is no server of mine. Your keys, preferences and statistics live in this browser&rsquo;s local storage &mdash; and only the extension&rsquo;s own pages can read them, not the YouTube page.</div>
         </div>
 
-        <div class="setting-section about-list">
-          <div class="about-row">
-            <span class="about-row-label">What it is</span>
-            <span class="about-row-value">A summarizer for YouTube. On any video that has captions, it adds a panel that turns the transcript into a clean, timestamped summary — so you can read the gist in a minute or jump straight to the part you care about.</span>
+        <div class="sec">
+          <p class="bz-k">What leaves this computer</p>
+          <div class="bz-flow">
+            <div class="bz-fl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h11M4 18h7"/></svg>
+              <div><b>The transcript</b><span>Only when you press Generate</span></div>
+              <span class="dest">to your AI</span>
+            </div>
+            <div class="bz-fl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              <div><b>Your key</b><span>As the header that authorises the request</span></div>
+              <span class="dest">with it</span>
+            </div>
+            <div class="bz-fl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
+              <div><b>Everything else</b><span>Preferences, statistics, what you watch</span></div>
+              <span class="dest none">nowhere</span>
+            </div>
           </div>
-          <div class="about-row">
-            <span class="about-row-label">How it works</span>
-            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Gemini, OpenAI, Anthropic, or your own endpoint — always with your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
-          </div>
-          <div class="about-row">
-            <span class="about-row-label">Detail &amp; theme</span>
-            <span class="about-row-value">Dial each summary from a quick skim to a thorough breakdown with the Detail control in the panel header. The panel follows YouTube's light or dark theme on its own — override it any time under Appearance.</span>
-          </div>
-          <div class="about-row">
-            <span class="about-row-label">What is sent where</span>
-            <span class="about-row-value">Your API keys, preferences and stats live only in this browser's local storage, never on a server of mine — and only the extension's own pages can read them, not the YouTube page. The transcript is sent to the provider that generates the summary, and nowhere else. On <strong>Auto</strong> that provider is chosen from the ones you have configured, and if the first one fails the transcript is sent to the next — members-only videos included. Keys being local is not the same as local AI: summarizing runs on the provider's servers unless you have pointed a custom provider at a local endpoint.</span>
-          </div>
-          <div class="about-row">
-            <span class="about-row-label">Captions</span>
-            <span class="about-row-value">When YouTube's transcript panel is unavailable, the extension reads the caption track the player already loaded for the video you are watching. Those caption responses stay in that page's memory — at most four tracks, cleared as soon as you navigate — and go nowhere except to your chosen provider, as the transcript.</span>
-          </div>
-          <div class="about-row">
-            <span class="about-row-label">Site access</span>
-            <span class="about-row-value">The extension can reach youtube.com and the three built-in provider APIs, and nothing else. Adding a custom provider asks Chrome for access to that one endpoint, and deleting the provider hands it back. Remote endpoints must use https — plain http is allowed only for localhost.</span>
-          </div>
+          <p class="bz-hint">Summarizing runs on the provider&rsquo;s servers &mdash; a key living on your machine is not the same as AI running on it. With more than one AI configured, Auto sends the transcript to the next one when the first fails, members-only videos included.</p>
         </div>
 
-        <div class="setting-section made-by">
-          <div class="made-by-line">Developed with <span class="heart">&hearts;</span> by Priyank</div>
-          <div class="made-by-sub">Feedback, a question, or a bug to report? I'd genuinely love to hear from you.</div>
-          <a class="contact-link" href="mailto:hello@priyank.design">hello@priyank.design</a>
+        <div class="sec">
+          <p class="bz-k">Sites this extension can reach</p>
+          <div class="bz-hosts">
+            <span class="bz-host">youtube.com</span>
+            <span class="bz-host">generativelanguage.googleapis.com</span>
+            <span class="bz-host">api.openai.com</span>
+            <span class="bz-host">api.anthropic.com</span>
+          </div>
+          <p class="bz-hint">Adding your own endpoint asks Chrome for that one host, and removing it hands the access back. Remote endpoints must use https &mdash; plain http is allowed only for localhost.</p>
         </div>
 
-        <div class="setting-section about-list">
-          <div class="about-row">
-            <span class="about-row-label">Version</span>
-            <span class="about-row-value">YouTube Transcript Extractor v1.2</span>
+        <div class="sec">
+          <p class="bz-k">Captions</p>
+          <p class="bz-para">When YouTube&rsquo;s transcript panel is unavailable, the extension reads the caption track the player already loaded for the video you are watching. Those responses stay in that page&rsquo;s memory &mdash; at most four tracks, cleared as soon as you navigate &mdash; and go nowhere except to your chosen AI, as the transcript.</p>
+        </div>
+
+        <div class="colophon">
+          <div class="colophon-mark" aria-hidden="true">
+            <img src="../icons/icon128.png" alt="">
           </div>
+          <div class="colophon-t">
+            <b>Timestamped Summary for YouTube</b>
+            <span>Version 1.4.0 &middot; free, and made with <span class="heart">&hearts;&#xFE0E;</span> by Priyank</span>
+          </div>
+          <a class="colophon-btn" href="mailto:hello@priyank.design">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            hello@priyank.design
+          </a>
         </div>
       </section>
 

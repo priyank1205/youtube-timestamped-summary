@@ -950,3 +950,8 @@
   background: var(--q-accent);
   opacity: 0.6;
 }
+
+/* The gist is hidden, not discarded: the overview text stays in the summary
+   so the setting can be turned back on without regenerating anything. */
+.yt-gist.yt-gist-off .yt-gist-eyebrow,
+.yt-gist.yt-gist-off .yt-gist-text { display: none; }

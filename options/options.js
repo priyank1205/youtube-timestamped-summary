@@ -1,6 +1,7 @@
 // options/options.js
 
 import { PROVIDERS, normalizeEndpoint, endpointOrigin, detectKeyProvider, modelLabel, configuredProviders } from '../scripts/providers.js';
+import { densityFor } from '../scripts/constants.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 
 // Reusable button-content markup
@@ -118,6 +119,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     setActiveModel(res.SELECTED_MODEL || 'auto');
     updateModelSelector();
     bindDeleteCustomBtns();
+    updateNavAi();
+  }
+
+  // The rail carries each destination's current value. For Your AI that is the
+  // provider actually doing the work: its name when there is one, "Auto" when
+  // several are configured and none is pinned.
+  function updateNavAi() {
+    const label = document.getElementById('nav-val-ai');
+    if (!label) return;
+    const ids = Object.keys(configured).filter((id) => configured[id]);
+    if (!ids.length) {
+      label.textContent = 'Not set';
+      return;
+    }
+    if (activeModelId && activeModelId !== 'auto' && configured[activeModelId]) {
+      label.textContent = ALL_PROVIDERS[activeModelId]?.name || activeModelId;
+      return;
+    }
+    label.textContent = ids.length === 1
+      ? (ALL_PROVIDERS[ids[0]]?.name || ids[0])
+      : 'Auto';
   }
 
   function getProviderFormHTML(p, inModal = false, savedModel = null) {
@@ -186,12 +208,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <div class="model-info">
             <div class="model-name">${escapeHtml(p.name)}</div>
-            <div class="model-desc">${escapeHtml(p.description)}</div>
+            <div class="model-desc" id="${id}-subline">${escapeHtml(p.description)}</div>
           </div>
           <span class="status-badge not-configured" id="${id}-status">Not set</span>
+          <button class="card-edit" id="${id}-edit" hidden>Replace key</button>
           ${p.isCustom ? `<button class="delete-custom-btn" data-id="${id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
         </div>
-        ${getProviderFormHTML(p, false, res ? res[`${p.id}_MODEL`] : null)}
+        <div class="card-model" id="${id}-modelrow" hidden>
+          <span>Model</span>
+          <select id="${id}-model-live" aria-label="Model"></select>
+        </div>
+        <div class="card-body" id="${id}-body">
+          ${getProviderFormHTML(p, false, res ? res[`${p.id}_MODEL`] : null)}
+        </div>
       </div>
     `;
     
@@ -228,6 +257,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       hint: document.getElementById(`${p.id}-key-hint`),
       helpToggle: document.getElementById(`${p.id}-help-toggle`),
       helpBody: document.getElementById(`${p.id}-help`),
+      // Present only on the settings card, not in the modal's config view.
+      body: document.getElementById(`${p.id}-body`),
+      modelRow: document.getElementById(`${p.id}-modelrow`),
+      modelLive: document.getElementById(`${p.id}-model-live`),
+      editBtn: document.getElementById(`${p.id}-edit`),
+      subline: document.getElementById(`${p.id}-subline`),
     };
 
     const pe = providerElements[p.id];
@@ -237,6 +272,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (configured[p.id]) {
         fetchAndPopulateModels(pe, res[p.storageKey] || '', res[`${p.id}_MODEL`]);
       }
+    }
+
+    if (pe.editBtn) {
+      // A working key is a settled thing: the card shows it and stays shut until
+      // you ask to change it, which is also when the field gets focus.
+      pe.editBtn.addEventListener('click', () => {
+        const open = pe.body && !pe.body.hidden;
+        setCardOpen(pe, !open);
+        if (!open && pe.input) pe.input.focus();
+      });
     }
 
     pe.saveBtn.addEventListener('click', () => handleSave(pe));
@@ -253,8 +298,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     pe.modelSelect.addEventListener('change', () => {
       chrome.storage.local.set({ [`${p.id}_MODEL`]: pe.modelSelect.value });
+      mirrorModelOptions(pe);
       showToast('Model saved');
     });
+
+    if (pe.modelLive) {
+      pe.modelLive.addEventListener('change', () => {
+        // The form's select stays the source of truth; this one drives it so
+        // both routes write the same key and fetchAndPopulateModels keeps working.
+        pe.modelSelect.value = pe.modelLive.value;
+        chrome.storage.local.set({ [`${p.id}_MODEL`]: pe.modelLive.value });
+        showToast('Model saved');
+      });
+    }
   }
 
   // The config view holds two different things: a built-in provider's key
@@ -357,6 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
           setSingleOption(p.modelSelect, initialVal, initialLabel);
           p.modelSelect.disabled = false;
+    mirrorModelOptions(p);
         };
 
         try {
@@ -374,6 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       } else {
         p.modelSelect.disabled = false;
+    mirrorModelOptions(p);
       }
     });
   }
@@ -431,6 +489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     p.modelSelect.disabled = false;
+    mirrorModelOptions(p);
   }
 
   function bindProviderEvents() {
@@ -540,6 +599,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function selectModel(modelId) {
     setActiveModel(modelId);
     chrome.storage.local.set({ SELECTED_MODEL: modelId });
+    updateNavAi();
     showToast('Provider updated');
     selectorModal.hidden = true;
   }
@@ -557,14 +617,221 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // --- Appearance (panel theme) ---
-  const themeSegmented = document.getElementById('theme-segmented');
-  if (themeSegmented) {
-    const themeOptions = themeSegmented.querySelectorAll('.segmented-option');
+  // --- Live preview -------------------------------------------------------
+  //
+  // Both Summaries and Panel show the panel they produce. It is built here from
+  // the current settings rather than hand-written into the markup, so one change
+  // updates every copy of it and nothing can drift out of sync.
+  // A real 47-minute talk, so the preview can show the counts the prompt will
+  // actually ask for. Point totals come from densityFor() — the same function
+  // the background uses to price a request — rather than numbers typed here.
+  const PREVIEW_MINUTES = 47;
+  const PREVIEW_POINTS = [
+    { title: 'Transforming electrons to tokens',
+      brief: 'The data centre as a factory.',
+      standard: 'Frames the data centre as a factory whose input is power and whose output is tokens.',
+      detailed: 'Frames the data centre as a factory whose input is power and whose output is tokens, and uses that framing for the rest of the talk.' },
+    { title: "Nvidia's core philosophy",
+      brief: 'Accelerate whole workloads.',
+      standard: 'Argues that accelerating whole workloads, not single operations, is what compounded.',
+      detailed: "Argues that accelerating whole workloads, not single operations, is what has compounded — citing CUDA's fifteen-year head start as the reason." },
+    { title: 'Why inference costs collapse',
+      brief: 'A claimed 30× cost drop.',
+      standard: 'Claims a 30× drop in cost per token over two hardware generations.',
+      detailed: 'Claims a 30× drop in cost per token over two generations. He does not say whether that figure is measured at equivalent quality.' },
+    { title: 'Buy compute like electricity',
+      brief: 'Plan around a cost curve.',
+      standard: 'Advises planning around a falling cost curve rather than a one-off purchase.',
+      detailed: 'Advises planning around a falling cost curve rather than a one-off purchase, with a worked example of a team that over-provisioned in 2023.' },
+    { title: 'The bottleneck moves to memory',
+      brief: 'Bandwidth, not FLOPs.',
+      standard: 'Explains why bandwidth, not FLOPs, sets the ceiling for long-context inference.',
+      detailed: 'Explains why memory bandwidth, not FLOPs, sets the ceiling for long-context inference, and what that implies for the shape of future models.' },
+    { title: 'What this means for small teams',
+      brief: 'Rent, do not build.',
+      standard: 'Closes on why small teams should rent capacity rather than build it.',
+      detailed: 'Closes on why small teams should rent capacity rather than build it, and which parts of the stack he expects to commoditise first.' }
+  ];
+  const PREVIEW_GIST = 'Huang argues the industry is shifting from selling chips to selling tokens, and that inference cost falls fast enough to reprice the whole stack.';
+  const DETAIL_META = {
+    brief:    { label: 'Brief',    rows: 3 },
+    standard: { label: 'Standard', rows: 4 },
+    detailed: { label: 'In-depth', rows: 6 }
+  };
+
+  // How many points a level asks for on the sample video, and how far apart
+  // they land. Both fall straight out of the density model.
+  function previewShape(level) {
+    const { target, sections } = densityFor(level, PREVIEW_MINUTES);
+    const rows = Math.min(DETAIL_META[level].rows, target, PREVIEW_POINTS.length);
+    const gap = PREVIEW_MINUTES / target;           // minutes between points
+    return { target, sections, rows, gap };
+  }
+
+  function clockAt(minutes) {
+    const total = Math.round(minutes * 60);
+    const m = Math.floor(total / 60);
+    const sec = String(total % 60).padStart(2, '0');
+    return `${m}:${sec}`;
+  }
+
+  let prefDetail = 'standard';
+  let prefGist = true;
+  let prefTheme = 'system';
+  let prefSkin = 'quiet';
+
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+
+  // Words a point carries at each level, from LENGTH_MODEL's output budget in
+  // scripts/constants.js (40 / 80 / 150 tokens) at the usual ~0.75 words per
+  // token. Only used for the "N min read" the Original panel prints.
+  const WORDS_PER_POINT = { brief: 30, standard: 60, detailed: 112 };
+  const readMinutes = (level, points) =>
+    Math.max(1, Math.round((points * WORDS_PER_POINT[level]) / 200));
+
+  const clockLong = (minutes) => {
+    const total = Math.round(minutes * 60);
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  };
+
+  // A miniature of the real panel: same surfaces, same type sizes, same
+  // structure. The two skins do not merely restyle one layout — Original puts
+  // the detail chip and the actions inside the overview card and titles the
+  // header with the extension's own name, so each is built on its own terms.
+  function renderPreview(host, { light }) {
+    if (!host) return;
+    const level = DETAIL_META[prefDetail] ? prefDetail : 'standard';
+    const shape = previewShape(level);
+    const classic = prefSkin === 'classic';
+
+    const pv = el('div', `pv${light ? ' lt' : ''}${classic ? ' classic' : ''}`);
+
+    // ---- header ----
+    const head = el('div', 'pv-head');
+    if (classic) {
+      head.append(el('b', null, 'Timestamped Summary'));
+      const over = el('span', 'pv-startover');
+      over.append(el('i', 'pv-undo'), 'Start over');
+      head.append(over, el('span', 'pv-collapse'));
+    } else {
+      head.append(el('b', null, 'Summary'));
+      const chip = el('span', 'pv-chip');
+      chip.append(DETAIL_META[level].label, el('i', null, '▾'));
+      head.append(chip);
+    }
+    pv.append(head);
+
+    // ---- overview card ----
+    if (prefGist) {
+      const gist = el('div', 'pv-gist');
+      const brief = el('div', 'pv-brief');
+      brief.append(el('p', 'pv-eyebrow', 'Overview'), el('p', 'pv-text', PREVIEW_GIST));
+
+      const rail = el('div', 'pv-rail');
+      if (classic) {
+        // Original prints runtime, point count and a read estimate together.
+        const runtime = el('span');
+        runtime.append(el('b', null, clockLong(PREVIEW_MINUTES)), ' video');
+        const pts = el('span');
+        pts.append(el('b', null, String(shape.target)), ' points');
+        const read = el('span');
+        read.append(el('b', null, `${readMinutes(level, shape.target)} min`), ' read');
+        rail.append(runtime, pts, read);
+      } else {
+        const pts = el('span');
+        pts.append(el('b', null, String(shape.target)), ' points');
+        rail.append(pts, el('span', null, `${PREVIEW_MINUTES} min`));
+      }
+      brief.append(rail);
+
+      if (classic) {
+        // and carries its actions plus the detail chip under the numbers.
+        const acts = el('div', 'pv-acts');
+        acts.append(el('span', 'pv-link', 'Show more'), el('span', 'pv-dot', '·'), el('span', 'pv-link', 'Copy'));
+        const chip = el('span', 'pv-chip');
+        chip.append(DETAIL_META[level].label, el('i', null, '⌄'));
+        acts.append(chip);
+        brief.append(acts);
+      }
+
+      gist.append(brief);
+      pv.append(gist);
+    }
+
+    pv.append(el('div', 'pv-sec', 'The economics of inference'));
+
+    const body = el('div', 'pv-body');
+    for (let i = 0; i < shape.rows; i += 1) {
+      const point = PREVIEW_POINTS[i];
+      const open = i === 0;
+      const row = el('div', `pv-row${open ? ' open' : ''}`);
+      // 0.7min in, then one point per gap — the spacing itself shows density.
+      row.append(el('span', 'pv-time', clockAt(0.7 + i * shape.gap)));
+      row.append(el('span', 'pv-t', point.title));
+      row.append(el('span', 'pv-chev'), el('span', 'pv-plus', open ? '−' : '+'));
+      body.append(row);
+      if (open) body.append(el('div', 'pv-desc', point[level]));
+    }
+    pv.append(body);
+
+    const remaining = shape.target - shape.rows;
+    if (remaining > 0) {
+      pv.append(el('div', 'pv-more', `+ ${remaining} more point${remaining === 1 ? '' : 's'}`));
+    }
+
+    host.replaceChildren(pv);
+  }
+
+  function refreshPreviews() {
+    const level = DETAIL_META[prefDetail] ? prefDetail : 'standard';
+    const shape = previewShape(level);
+
+    // One theme decision for both previews: Auto follows YouTube, and the
+    // settings page assumes the dark YouTube it is sitting next to.
+    const light = prefTheme === 'light';
+    renderPreview(document.getElementById('preview-summaries'), { light });
+    renderPreview(document.getElementById('preview-panel'), { light });
+
+    const capS = document.getElementById('preview-cap-summaries');
+    if (capS) {
+      capS.replaceChildren();
+      const b = document.createElement('b');
+      b.textContent = `${shape.target} points across ${shape.sections} section${shape.sections === 1 ? '' : 's'}`;
+      capS.append(b, ` on a ${PREVIEW_MINUTES}-minute video — one about every `
+        + `${Math.round(shape.gap)} minute${Math.round(shape.gap) === 1 ? '' : 's'}.`);
+    }
+    const capP = document.getElementById('preview-cap-panel');
+    if (capP) {
+      capP.replaceChildren();
+      const themeLine = prefTheme === 'light'
+        ? 'Always light, whatever theme YouTube is in.'
+        : prefTheme === 'dark'
+          ? 'Always dark, whatever theme YouTube is in.'
+          : 'YouTube is in dark right now, so Auto renders dark.';
+      const b = document.createElement('b');
+      b.textContent = prefSkin === 'classic' ? 'Original' : 'Refined';
+      capP.append(b, ' — ', themeLine);
+    }
+  }
+
+  // --- Panel theme ---
+  // The three cards are miniature panels; `data-label` carries the word for the
+  // rail and the toast, because the button's own text also holds its description.
+  const navValTheme = document.getElementById('nav-val-theme');
+  const themeGroup = document.getElementById('theme-options');
+  if (themeGroup) {
+    const themeOptions = Array.from(themeGroup.querySelectorAll('[data-theme]'));
     const setActiveTheme = (pref) => {
-      themeOptions.forEach((o) =>
-        o.setAttribute('aria-checked', o.dataset.theme === pref ? 'true' : 'false')
-      );
+      const chosen = themeOptions.find((o) => o.dataset.theme === pref) || themeOptions[0];
+      themeOptions.forEach((o) => o.setAttribute('aria-checked', o === chosen ? 'true' : 'false'));
+      prefTheme = chosen ? chosen.dataset.theme : 'system';
+      if (navValTheme && chosen) navValTheme.textContent = chosen.dataset.label;
+      refreshPreviews();
     };
     chrome.storage.local.get(['THEME_PREF'], (res) => setActiveTheme(res.THEME_PREF || 'system'));
     themeOptions.forEach((o) => {
@@ -572,42 +839,151 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pref = o.dataset.theme;
         setActiveTheme(pref);
         chrome.storage.local.set({ THEME_PREF: pref });
-        showToast(`Panel appearance: ${o.textContent}`);
+        showToast(`Panel theme: ${o.dataset.label}`);
       });
     });
   }
 
-  // --- Appearance (panel design skin) ---
-  const skinSegmented = document.getElementById('skin-segmented');
-  if (skinSegmented) {
-    const skinOptions = skinSegmented.querySelectorAll('.segmented-option');
+  // --- Panel design (the PANEL_SKIN preference) ---
+  const skinGroup = document.getElementById('skin-options');
+  if (skinGroup) {
+    const skinOptions = Array.from(skinGroup.querySelectorAll('[data-skin]'));
     const setActiveSkin = (pref) => {
-      skinOptions.forEach((o) =>
-        o.setAttribute('aria-checked', o.dataset.skin === pref ? 'true' : 'false')
-      );
+      const chosen = skinOptions.find((o) => o.dataset.skin === pref) || skinOptions[0];
+      skinOptions.forEach((o) => o.setAttribute('aria-checked', o === chosen ? 'true' : 'false'));
+      prefSkin = chosen ? chosen.dataset.skin : 'quiet';
+      refreshPreviews();
     };
     chrome.storage.local.get(['PANEL_SKIN'], (res) => setActiveSkin(res.PANEL_SKIN || 'quiet'));
     skinOptions.forEach((o) => {
       o.addEventListener('click', () => {
-        const pref = o.dataset.skin;
-        setActiveSkin(pref);
-        chrome.storage.local.set({ PANEL_SKIN: pref });
-        showToast(`Panel design: ${o.textContent}`);
+        setActiveSkin(o.dataset.skin);
+        chrome.storage.local.set({ PANEL_SKIN: o.dataset.skin });
+        showToast(`Panel design: ${o.dataset.label}`);
       });
     });
   }
 
+  // --- Detail: the level every new summary starts at ---
+  //
+  // Writes SUMMARY_LENGTH, the same key the panel's own Detail chip keeps, so
+  // the background's storage listener broadcasts PREFS_CHANGED and any open
+  // panel re-syncs without a reload.
+  const navValDetail = document.getElementById('nav-val-detail');
+  const detailGroup = document.getElementById('detail-options');
+  const detailEffect = document.getElementById('detail-effect');
+  if (detailGroup) {
+    const detailOptions = Array.from(detailGroup.querySelectorAll('[data-detail]'));
+    const setActiveDetail = (pref) => {
+      const chosen = detailOptions.find((o) => o.dataset.detail === pref) || detailOptions[1];
+      detailOptions.forEach((o) => o.setAttribute('aria-checked', o === chosen ? 'true' : 'false'));
+      prefDetail = chosen ? chosen.dataset.detail : 'standard';
+      if (navValDetail && chosen) navValDetail.textContent = chosen.dataset.label;
+      if (detailEffect) {
+        const shape = previewShape(DETAIL_META[prefDetail] ? prefDetail : 'standard');
+        detailEffect.textContent = `On a ${PREVIEW_MINUTES}-minute video that is about `
+          + `${shape.target} points across ${shape.sections} section${shape.sections === 1 ? '' : 's'}`
+          + `, one every ${Math.round(shape.gap)} minute${Math.round(shape.gap) === 1 ? '' : 's'}.`;
+      }
+      refreshPreviews();
+    };
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => setActiveDetail(res.SUMMARY_LENGTH || 'standard'));
+    detailOptions.forEach((o) => {
+      o.addEventListener('click', () => {
+        const pref = o.dataset.detail;
+        setActiveDetail(pref);
+        chrome.storage.local.set({ SUMMARY_LENGTH: pref });
+        showToast(`New summaries: ${o.dataset.label}`);
+      });
+    });
+  }
+
+  // --- Open with a gist ---
+  //
+  // The overview line is always written (the prompt and validator both require
+  // it, and it travels inside the saved summary text), so this is a display
+  // preference: turning it off hides the paragraph in the panel, and turning it
+  // back on costs nothing because the text is already there.
+  const gistToggle = document.getElementById('gist-toggle');
+  if (gistToggle) {
+    const setGist = (on) => {
+      prefGist = on !== false;
+      gistToggle.setAttribute('aria-checked', prefGist ? 'true' : 'false');
+      refreshPreviews();
+    };
+    chrome.storage.local.get(['SHOW_GIST'], (res) => setGist(res.SHOW_GIST !== false));
+    gistToggle.addEventListener('click', () => {
+      const next = gistToggle.getAttribute('aria-checked') !== 'true';
+      setGist(next);
+      chrome.storage.local.set({ SHOW_GIST: next });
+      showToast(next ? 'Summaries open with a gist' : 'Gist hidden');
+    });
+  }
+
+  // --- Statistics ----------------------------------------------------------
+  //
+  // Two numbers are all this extension records, so the page makes them legible
+  // rather than inventing a chart it has no data for: one dot per summary, and
+  // arithmetic on the counter that is labelled as arithmetic.
+  const DOT_CAP = 120;          // beyond this the grid stops being countable
+  const FILM_SECONDS = 2 * 3600; // a "feature film" for the comparison below
+
   const statSummaries = document.getElementById('stat-summaries');
   const statTimeSaved = document.getElementById('stat-time-saved');
-  if (statSummaries && statTimeSaved) {
+  const statDots = document.getElementById('stat-dots');
+  const statAvg = document.getElementById('stat-avg');
+  const statFilms = document.getElementById('stat-longest');
+  const statEmpty = document.getElementById('stat-empty');
+  const navValStats = document.getElementById('nav-val-stats');
+
+  if (statSummaries) {
     chrome.storage.local.get(['SUMMARIES_COUNT', 'SECONDS_SAVED'], (res) => {
-      statSummaries.textContent = String(res.SUMMARIES_COUNT || 0);
-      statTimeSaved.textContent = formatDuration(res.SECONDS_SAVED || 0);
+      const count = Math.max(0, Number(res.SUMMARIES_COUNT) || 0);
+      const saved = Math.max(0, Number(res.SECONDS_SAVED) || 0);
+
+      statSummaries.textContent = String(count);
+      if (statTimeSaved) statTimeSaved.textContent = formatDuration(saved);
+      if (navValStats) navValStats.textContent = count ? String(count) : '';
+
+      if (statAvg) {
+        statAvg.textContent = count ? formatDuration(saved / count) : '—';
+      }
+      if (statFilms) {
+        const films = saved / FILM_SECONDS;
+        statFilms.textContent = !count ? '—'
+          : films < 1 ? films.toFixed(1)
+          : String(Math.round(films));
+      }
+      if (statEmpty) statEmpty.hidden = count > 0;
+
+      if (statDots) {
+        statDots.replaceChildren();
+        // A dot for every summary, up to where a grid is still countable.
+        // Under ten, a few empty dots show what the row is going to become.
+        const shown = Math.min(count, DOT_CAP);
+        for (let i = 0; i < shown; i += 1) {
+          const dot = document.createElement('span');
+          dot.className = 'stat-dot';
+          dot.style.animationDelay = `${Math.min(i * 12, 900)}ms`;
+          statDots.appendChild(dot);
+        }
+        for (let i = shown; i < Math.max(10, shown); i += 1) {
+          const dot = document.createElement('span');
+          dot.className = 'stat-dot ghost';
+          statDots.appendChild(dot);
+        }
+        if (count > DOT_CAP) {
+          const more = document.createElement('span');
+          more.className = 'stat-more';
+          more.textContent = `+${count - DOT_CAP}`;
+          statDots.appendChild(more);
+        }
+      }
     });
   }
 
   function formatDuration(seconds) {
-    const s = Math.max(0, Math.round(seconds));
+    const s = Math.max(0, Math.round(Number(seconds) || 0));
     if (s === 0) return '0m';
     if (s < 60) return '<1m';
     const totalMin = Math.floor(s / 60);
@@ -777,6 +1153,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       p.hint.hidden = false;
       if (p.removeBtn) p.removeBtn.hidden = false;
       if (p.helpToggle) setAccordion(p, false);
+      // The card's own second line becomes the key, so the tile says what it
+      // is connected with while the form stays out of the way.
+      if (p.subline) {
+        p.subline.textContent = key
+          ? `••••••••${String(key).slice(-4)}`
+          : 'No key needed for this endpoint';
+        p.subline.classList.add('is-key');
+      }
+      if (p.modelRow) p.modelRow.hidden = false;
+      mirrorModelOptions(p);
+      setCardOpen(p, false);
     } else {
       p.input.value = '';
       p.input.classList.remove('secured');
@@ -784,7 +1171,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       p.hint.hidden = true;
       if (p.removeBtn) p.removeBtn.hidden = true;
       if (p.helpToggle) setAccordion(p, true);
+      if (p.subline) {
+        p.subline.textContent = p.description || '';
+        p.subline.classList.remove('is-key');
+      }
+      if (p.modelRow) p.modelRow.hidden = true;
+      setCardOpen(p, true);
     }
+  }
+
+  // The form's <select> is filled asynchronously by fetchAndPopulateModels;
+  // the card's own select is a mirror of whatever it ends up holding.
+  function mirrorModelOptions(p) {
+    if (!p.modelLive || !p.modelSelect) return;
+    p.modelLive.replaceChildren(...Array.from(p.modelSelect.options).map((o) => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.textContent;
+      return opt;
+    }));
+    p.modelLive.value = p.modelSelect.value;
+    p.modelLive.disabled = p.modelSelect.disabled;
+  }
+
+  // Collapse or open a provider card's form. Only the settings cards have a
+  // body to collapse; the modal's config view is already a single form.
+  function setCardOpen(p, open) {
+    if (!p.body) return;
+    p.body.hidden = !open;
+    if (p.editBtn) {
+      p.editBtn.hidden = open;
+      p.editBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    const card = document.getElementById(`card-${p.id}`);
+    if (card) card.classList.toggle('is-open', open);
   }
 
   function setAccordion(p, open) {
@@ -846,13 +1266,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!badge) return;
     if (state === true) {
       badge.className = 'status-badge configured';
-      badge.textContent = 'Active';
+      badge.textContent = 'Connected';
     } else if (state === 'invalid') {
       badge.className = 'status-badge invalid';
       badge.textContent = 'Invalid key';
     } else {
       badge.className = 'status-badge not-configured';
-      badge.textContent = 'Not set';
+      badge.textContent = 'No key yet';
     }
   }
 
@@ -1356,7 +1776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // rather than reimplementing it inside the flow.
     function openCustomProvider() {
       closeSetup();
-      showPane('providers');
+      showPane('ai');
       const addBtn = document.getElementById('add-provider-btn');
       const customItem = document.getElementById('add-custom-provider-item');
       if (addBtn) addBtn.click();
@@ -1367,7 +1787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // which also offers the custom form as its own last entry.
     function openProviderList() {
       closeSetup();
-      showPane('providers');
+      showPane('ai');
       const addBtn = document.getElementById('add-provider-btn');
       if (addBtn) addBtn.click();
     }
