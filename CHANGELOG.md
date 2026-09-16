@@ -9,6 +9,29 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Removed
+
+- **Open with a gist**, the switch for the overview line above the timestamps.
+  The line is two or three sentences, it is written either way — the prompt and
+  the validator both require it, and it travels inside the saved summary — and
+  a screen with one Detail choice on it did not need a second decision guarding
+  something that short. The overview now always shows.
+
+### Fixed
+
+- The panel preview on the **Summaries** and **Panel** screens is a faithful
+  miniature again. It had drifted far enough to be misleading: Refined's header
+  was invented (*Summary* with a detail chip, where the panel says *Timestamped
+  Summary* with **Start over** and a collapse chevron, and keeps the chip in the
+  overview card); the stats rail printed two figures instead of the panel's
+  three; Original in light drew a white header where the panel draws a solid red
+  bar on a grey shell; and a red-bordered row was labelled *open* when in the
+  panel it means *playing now*, which also fills the time pill. Every value is
+  now measured off the rendered panel, and the first row reads as the point
+  playing now, which is where the panel sits for most of a video.
+- Updating clears `SHOW_GIST` from local storage rather than leaving a setting
+  behind that nothing reads.
+
 ## 1.5.0 — 2026-09-16
 
 ### Added

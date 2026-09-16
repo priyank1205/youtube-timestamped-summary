@@ -90,30 +90,21 @@ test('the panel is told what it renders and nothing else', async () => {
   Object.assign(state, {
     GEMINI_API_KEY: 'secret-gemini', ANTHROPIC_API_KEY: 'secret-anthropic',
     SUMMARY_LENGTH: 'brief', THEME_PREF: 'dark', PANEL_SKIN: 'classic',
-    SHOW_GIST: false, SELECTED_MODEL: 'anthropic'
+    SELECTED_MODEL: 'anthropic'
   });
 
   const prefs = await send({ action: 'GET_PANEL_PREFS' });
 
   assert.deepEqual(Object.keys(prefs).sort(),
-    ['providerReady', 'showGist', 'skin', 'summaryLength', 'theme']);
+    ['providerReady', 'skin', 'summaryLength', 'theme']);
   assert.deepEqual(prefs, {
     summaryLength: 'brief', theme: 'dark', skin: 'classic',
-    showGist: false, providerReady: true
+    providerReady: true
   });
   // Which provider is configured is not the panel's business, and neither is
   // any key: no value anywhere in the payload is a stored secret.
   assert.ok(!JSON.stringify(prefs).includes('anthropic'));
   assert.ok(!JSON.stringify(prefs).includes('secret'));
-});
-
-test('the gist shows unless it has been turned off', async () => {
-  reset();
-  Object.assign(state, { GEMINI_API_KEY: 'secret-gemini' });
-  assert.equal((await send({ action: 'GET_PANEL_PREFS' })).showGist, true);
-
-  state.SHOW_GIST = false;
-  assert.equal((await send({ action: 'GET_PANEL_PREFS' })).showGist, false);
 });
 
 test('provider readiness covers a keyless local custom provider', async () => {

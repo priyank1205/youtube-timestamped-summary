@@ -39,6 +39,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
   migrateRetiredModels();
   dropRemovedProviders();
+  dropRetiredPrefs();
   refreshActionBadge();
 });
 
@@ -111,6 +112,25 @@ async function dropRemovedProviders() {
     }
   } catch (err) {
     console.warn('Removed-provider cleanup failed:', err.message);
+  }
+}
+
+// Settings that no longer exist. SHOW_GIST hid the overview line above the
+// timestamps; the line is short, it is written either way, and a switch for it
+// was one decision more than the screen earned. The stored value would sit in
+// the profile forever otherwise, answering a question nothing asks.
+const RETIRED_PREFS = ['SHOW_GIST'];
+
+async function dropRetiredPrefs() {
+  try {
+    const stored = await chrome.storage.local.get(RETIRED_PREFS);
+    const present = RETIRED_PREFS.filter((key) => key in stored);
+    if (present.length) {
+      await chrome.storage.local.remove(present);
+      console.log(`Cleared retired settings: ${present.join(', ')}`);
+    }
+  } catch (err) {
+    console.warn('Retired-setting cleanup failed:', err.message);
   }
 }
 
@@ -396,7 +416,7 @@ const WRITABLE_PANEL_PREFS = {
 async function panelPrefs() {
   const allProviders = await loadProviders();
   const storage = await chrome.storage.local.get([
-    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_GIST',
+    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN',
     ...Object.values(allProviders).map((p) => p.storageKey)
   ]);
   const providerReady = configuredProviderIds(allProviders, storage).length > 0;
@@ -404,8 +424,6 @@ async function panelPrefs() {
     summaryLength: storage.SUMMARY_LENGTH || 'standard',
     theme: storage.THEME_PREF || 'system',
     skin: storage.PANEL_SKIN || 'quiet',
-    // The overview line is always written; this only says whether to show it.
-    showGist: storage.SHOW_GIST !== false,
     // Whether generation is possible at all — the panel uses it to choose
     // between "Generate summary" and "Add API key".
     providerReady
@@ -445,7 +463,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // rest are the preferences the panel renders directly.
   const relevant = Object.keys(changes).some((key) =>
     key.endsWith('_API_KEY') || key === 'CUSTOM_PROVIDERS' ||
-    ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_GIST'].includes(key));
+    ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN'].includes(key));
   if (relevant) {
     broadcastPanelPrefs();
     refreshActionBadge();

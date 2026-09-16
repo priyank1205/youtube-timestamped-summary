@@ -2112,49 +2112,12 @@
     .bz-o .bz-mini.original i.r { background: #3a3a3a; }
     .bz-o .bz-mini.original { gap: 4px; }
 
-    /* ---- switch ---- */
-    .bz-row { display: flex; align-items: flex-start; gap: 18px; }
-    .bz-row-t { flex: 1; min-width: 0; }
-    .bz-row-t b { display: block; font-size: 13.5px; font-weight: 600; color: var(--bz-ink); letter-spacing: -0.008em; }
-    .bz-row-t span { display: block; font-size: 11.5px; color: var(--bz-faint); margin-top: 3px; line-height: 1.55; max-width: 56ch; }
-    /* Off is a well cut into the plane; on is the same well lit from inside.
-       The accent carries "on" here exactly as it carries "chosen" on a card. */
-    .bz-sw {
-      width: 44px; height: 26px; border-radius: 13px; position: relative; flex: 0 0 auto;
-      margin-top: 1px; cursor: pointer; border: 0; padding: 0;
-      background: #131318; box-shadow: var(--bz-cut);
-      transition: background .2s ease, box-shadow .2s ease;
-    }
-    .bz-sw::after {
-      content: ''; position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%;
-      background: linear-gradient(#5a5a66, #42424d);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.14);
-      transition: left .22s cubic-bezier(0.16,1,0.3,1), background .2s ease;
-    }
-    .bz-sw[aria-checked="true"] {
-      background: linear-gradient(#d95a46, #b8402f);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),
-                  inset 0 -1px 2px rgba(0,0,0,0.3),
-                  0 0 0 3px rgba(224,112,95,0.12),
-                  0 3px 12px -4px rgba(224,112,95,0.55);
-    }
-    .bz-sw[aria-checked="true"]::after {
-      left: 22px;
-      background: linear-gradient(#fff, #f2eceb);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 #fff;
-    }
-    .bz-sw:hover { box-shadow: var(--bz-cut), 0 0 0 3px rgba(255,255,255,0.04); }
-    .bz-sw[aria-checked="true"]:hover {
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),
-                  0 0 0 3px rgba(224,112,95,0.2),
-                  0 3px 14px -4px rgba(224,112,95,0.7);
-    }
-
     /* ---- preview column: a faithful miniature of the real panel -----------
-       Values below are lifted from styles/skin-quiet.css and styles/content.css
-       (surface, chip, divider, type sizes) so what you see here is what the
-       sidebar renders. Descriptions are collapsed in the real panel too — one
-       row is shown open, the way you would leave it after clicking. */
+       Every value below is measured off the rendered panel in dev/preview.html
+       and lifted from styles/skin-quiet.css and styles/content.css, so what is
+       drawn here is what the sidebar draws. Descriptions are collapsed in the
+       real panel too — the first row is shown open, and marked as the point
+       playing now, the way the panel looks while a video runs. */
     .pane-aside {
       background: var(--bz-well); min-width: 0;
       box-shadow: inset 1px 0 0 #1a1a20, inset 4px 0 10px -8px #000;
@@ -2162,160 +2125,211 @@
     }
     .bz-prevwrap { max-width: 412px; }
 
+    /* Refined skin (the default) — tokens are 1:1 with --q-* in
+       styles/skin-quiet.css, so the miniature inherits that skin's decisions
+       rather than approximating them. */
     .pv {
       --s: #181818; --raised: #212121; --bd: rgba(255,255,255,0.09);
       --dv: rgba(255,255,255,0.06); --chip: rgba(255,255,255,0.08);
+      --hov: rgba(255,255,255,0.05);
       --t1: #f1f1f1; --t2: #aaaaaa; --t3: #8a8a8a;
       --acc: #cc0000; --acc-t: #ff5c5c; --acc-tint: rgba(255,70,70,0.12);
+      --on-acc: #ffffff;
       background: var(--s); border: 1px solid var(--bd); border-radius: 12px;
       overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.35);
-      font-size: 13px;
+      /* The panel lives inside YouTube and inherits its stack, so the miniature
+         asks for the same one instead of the settings page's. */
+      font-family: Roboto, Arial, sans-serif; font-size: 13px;
     }
     .pv.lt {
-      --s: #ffffff; --raised: #fafafa; --bd: #e5e5e5; --dv: rgba(0,0,0,0.07);
-      --chip: rgba(0,0,0,0.05); --t1: #0f0f0f; --t2: #606060; --t3: #909090;
+      --s: #ffffff; --raised: #ffffff; --bd: #e5e5e5; --dv: rgba(0,0,0,0.07);
+      --chip: rgba(0,0,0,0.05); --hov: rgba(0,0,0,0.035);
+      --t1: #0f0f0f; --t2: #606060; --t3: #909090;
       --acc-t: #cc0000; --acc-tint: rgba(204,0,0,0.07);
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .pv-head { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-bottom: 1px solid var(--dv); }
-    .pv-head b { font-size: 13px; font-weight: 500; color: var(--t1); }
-    .pv-chip {
-      margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
-      font-size: 11px; font-weight: 500; color: var(--t2);
-      background: var(--chip); border-radius: 20px; padding: 4px 9px;
-    }
-    .pv-chip i { font-style: normal; font-size: 8px; opacity: 0.8; }
 
-    /* the gist card, exactly as .yt-brief draws it */
+    /* Header. Both skins draw the same three things — the extension's name,
+       Start over, and the collapse chevron — and only restyle them. */
+    .pv-head { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--dv); }
+    .pv-headleft { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .pv-head b { font-size: 14px; font-weight: 500; color: var(--t1); }
+    .pv-startover {
+      display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+      padding: 3px 9px 3px 7px; border: 1px solid transparent; border-radius: 999px;
+      font-size: 11px; font-weight: 500; line-height: 1; color: var(--t3);
+    }
+    .pv-startover svg { display: block; flex: 0 0 auto; position: relative; top: -0.5px; }
+    .pv-collapse {
+      margin-left: auto; padding-left: 8px; margin-right: 8px; font-size: 18px;
+      line-height: 1; color: var(--t3); transform: rotate(-90deg);
+    }
+
+    .pv-list { padding: 2px 0 10px; }
+
+    /* The overview card: .yt-gist wrapping .yt-brief. Same in both skins —
+       eyebrow, prose, the three stats, then the actions and the detail chip. */
     .pv-gist { padding: 12px 12px 14px; border-bottom: 1px solid var(--dv); }
     .pv-brief { background: var(--raised); border: 1px solid var(--bd); border-radius: 10px; padding: 13px 14px 11px; }
-    .pv-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.7px; color: var(--t3); margin: 0 0 8px; }
-    .pv-text { font-size: 13px; line-height: 1.6; color: var(--t1); margin: 0; }
-    .pv-rail { display: flex; gap: 12px; margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--dv); font-size: 11px; color: var(--t3); }
-    .pv-rail b { color: var(--t2); font-weight: 500; }
-
-    .pv-sec { font-size: 11px; font-weight: 500; color: var(--t3); letter-spacing: 0.7px; padding: 18px 16px 6px; }
-    .pv-row { display: flex; align-items: center; gap: 0; padding: 12px 16px; }
-    .pv-time {
-      font-size: 12px; font-weight: 500; color: var(--t2); background: var(--chip);
-      padding: 3px 9px; border-radius: 16px; margin-right: 12px; min-width: 50px;
-      text-align: center; font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    .pv.lt .pv-brief { background: #fafafa; }
+    .pv-eyebrow {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.7px; text-transform: uppercase;
+      color: var(--t3); margin: 0 0 8px;
     }
+    /* Clamped to three lines, which is what puts Show more there. */
+    .pv-text {
+      font-size: 13px; line-height: 1.6; color: var(--t1); margin: 0;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+    }
+    .pv-rail {
+      display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 11px; padding-top: 10px;
+      border-top: 1px solid var(--dv); font-size: 11.5px; line-height: 1.5; color: var(--t3);
+    }
+    .pv-rail b { color: var(--t2); font-weight: 500; }
+    .pv-acts { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .pv-link { font-size: 12px; line-height: 1.4; color: var(--t3); }
+    .pv-dot { font-size: 12px; color: var(--t3); opacity: 0.6; }
+    .pv-chip {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border: 1px solid transparent; border-radius: 999px;
+      background: var(--chip); color: var(--t2);
+      font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap;
+    }
+    .pv-chip svg { display: block; opacity: 0.65; }
+
+    .pv-sec {
+      font-size: 11px; font-weight: 500; color: var(--t3); letter-spacing: 0.7px;
+      text-transform: uppercase; padding: 20px 16px 6px;
+    }
+    .pv-row { display: flex; align-items: center; padding: 12px 16px; position: relative; }
+    .pv-row + .pv-row, .pv-desc + .pv-row { border-top: 1px solid var(--dv); }
+    .pv-time {
+      position: relative; font-size: 12px; font-weight: 500; color: var(--t2); background: var(--chip);
+      padding: 3px 9px; border-radius: 999px; margin-right: 12px; min-width: 50px;
+      box-sizing: border-box; text-align: center; font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .pv-timetext { display: inline-block; }
     .pv-row.open .pv-time { background: var(--acc-tint); color: var(--acc-t); }
-    .pv-t { font-size: 14px; font-weight: 400; color: var(--t1); line-height: 1.35; flex: 1; min-width: 0; }
-    .pv-row.open .pv-t { font-weight: 500; }
-    .pv-chev { flex: 0 0 auto; width: 7px; height: 7px; margin: 0 4px 0 10px;
-      border-right: 1.6px solid var(--t3); border-bottom: 1.6px solid var(--t3);
-      transform: rotate(45deg); }
-    .pv-row.open .pv-chev { transform: rotate(-135deg); border-color: var(--t1); }
+    /* The point playing right now, with the hairline showing progress through
+       it — the state the panel is in for most of a video. */
+    .pv-row.now { background: var(--hov); box-shadow: inset 2px 0 0 var(--acc); }
+    .pv-row.now .pv-time { background: var(--acc); color: var(--on-acc); }
+    /* Refined holds its hover affordance open on the current point: the play
+       glyph in, the digits nudged across. */
+    .pv-row.now .pv-time::before {
+      content: ''; position: absolute; left: 6px; top: 50%; width: 0; height: 0;
+      border-left: 5px solid currentColor;
+      border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+      transform: translateY(-50%);
+    }
+    .pv-row.now .pv-timetext { transform: translateX(3px); }
+    .pv-row.now::after {
+      content: ''; position: absolute; left: 0; bottom: 0; height: 1.5px;
+      width: 38%; background: var(--acc); opacity: 0.55;
+    }
+    .pv-t { font-size: 14px; font-weight: 400; color: var(--t1); line-height: normal; flex: 1; min-width: 0; }
+    .pv-row.open .pv-t, .pv-row.now .pv-t { font-weight: 500; }
+    /* One element for the expand control: Refined blanks the glyph and draws a
+       chevron over it, which is exactly what the skin does to .yt-expand-btn. */
+    .pv-plus { flex: 0 0 auto; font-size: 0; color: var(--t3); padding: 8px 10px; margin-left: 8px; }
+    .pv-plus::after {
+      content: ''; display: block; width: 7px; height: 7px;
+      border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+      transform: rotate(45deg);
+    }
+    .pv-row.open .pv-plus::after { transform: rotate(-135deg); }
     .pv-desc {
       font-size: 13px; line-height: 1.55; color: var(--t2);
-      margin: -4px 16px 6px 16px; padding: 2px 0 8px 12px; border-left: 2px solid var(--dv);
+      margin: 0 0 0 16px; padding: 2px 16px 14px 12px; border-left: 2px solid var(--dv);
     }
-    .pv-more { padding: 10px 16px 13px; font-size: 11px; color: var(--t3); border-top: 1px solid var(--dv); }
+    /* Not part of the panel — the rows are trimmed here, and this says by how
+       many, so the point count above still means something. */
+    .pv-more { padding: 14px 16px 0; font-size: 11px; color: var(--t3); }
 
-    /* Original skin — values from styles/content.css: rows #1a1a1a on #333 at
-       8px with 4px gaps, the red time pill, a section header that is 12px/700
-       white at half opacity over a #333 rule, and the overview card carrying
-       the runtime, the actions and the detail chip rather than the header. */
-    .pv.classic { --s: #0f0f0f; --bd: #333; }
+    /* Original skin — values from styles/content.css: a 16px shell on #0d0d0d
+       under a gradient header bar, rows as #1a1a1a cards on #333 at 8px, the
+       red time pill, and a section rule that is 12px/700 white at half opacity. */
+    .pv.classic { --s: #0d0d0d; --bd: #333; border-radius: 16px; }
     .pv.classic .pv-head {
-      padding: 13px 14px; border-bottom: 2px solid #cc0000; gap: 10px;
+      background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+      border-bottom: 2px solid #591010; border-radius: 16px 16px 0 0;
     }
-    .pv.classic .pv-head b { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
-    .pv-startover { display: none; }
-    .pv.classic .pv-startover {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 12px; color: #aaa;
-    }
-    .pv.classic .pv-startover .pv-undo {
-      width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 50%;
-      border-right-color: transparent; transform: rotate(-45deg); display: block;
-    }
-    .pv-collapse { display: none; }
-    .pv.classic .pv-collapse {
-      display: block; margin-left: auto; width: 8px; height: 8px;
-      border-left: 1.6px solid #aaa; border-top: 1.6px solid #aaa;
-      transform: rotate(45deg); margin-top: 3px;
-    }
-
-    .pv.classic .pv-gist { padding: 12px 12px 4px; border-bottom: 0; }
-    .pv.classic .pv-brief { background: #1a1a1a; border-color: #333; border-radius: 10px; padding: 12px 13px 11px; }
+    .pv.classic .pv-head b { font-size: 15px; font-weight: 700; color: #fff; }
+    .pv.classic .pv-startover { color: #888; opacity: 0.85; }
+    .pv.classic .pv-collapse { font-size: 22px; font-weight: 700; color: #888; }
+    .pv.classic .pv-list { padding: 0 14px 14px; }
+    .pv.classic .pv-gist { padding: 12px 0; margin-bottom: 4px; border-bottom: 1px solid #333; }
+    .pv.classic .pv-brief { background: #171717; border-color: #333; }
     .pv.classic .pv-eyebrow {
-      font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
-      text-transform: uppercase; color: #8a8a8a; margin-bottom: 6px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: #8a8a8a; margin-bottom: 6px;
     }
-    .pv.classic .pv-text { font-size: 13px; line-height: 1.55; color: #e8e8e8; }
-    .pv.classic .pv-rail {
-      gap: 2px 14px; margin-top: 11px; padding-top: 10px;
-      border-top: 1px solid #333; font-size: 11.5px; color: #8a8a8a;
+    .pv.classic .pv-text { color: #e0dcdc; }
+    .pv.classic .pv-rail { border-top-color: #333; color: #8a8a8a; }
+    .pv.classic .pv-rail b { color: #c4bebe; }
+    .pv.classic .pv-link { color: #8a8a8a; }
+    .pv.classic .pv-dot { color: #5a5a5a; opacity: 1; }
+    .pv.classic .pv-chip {
+      background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); color: #ededed;
     }
-    .pv.classic .pv-rail b { color: #c4bebe; font-weight: 500; }
-    .pv-acts { display: none; }
-    .pv.classic .pv-acts {
-      display: flex; align-items: center; gap: 7px; margin-top: 9px;
-    }
-    .pv.classic .pv-link { font-size: 12px; color: #aaa; cursor: pointer; }
-    .pv.classic .pv-link:hover { color: #fff; }
-    .pv.classic .pv-dot { color: #5a5a5a; font-size: 12px; }
-    .pv.classic .pv-acts .pv-chip {
-      margin-left: auto; font-size: 12px; color: #f1f1f1;
-      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 999px; padding: 3px 9px;
-    }
-
     .pv.classic .pv-sec {
-      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 8px 0; margin: 12px 12px 0; border-bottom: 1px solid #333;
+      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.5px;
+      padding: 8px 0; margin: 12px 0 8px; border-bottom: 1px solid #333;
     }
-
-    .pv.classic .pv-body { padding: 4px 12px 10px; }
     .pv.classic .pv-row {
       background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
-      padding: 10px 14px; margin: 4px 0;
+      padding: 10px 14px; margin: 4px 0; overflow: hidden;
     }
-    .pv.classic .pv-row.open { border-color: #cc0000; }
+    .pv.classic .pv-row + .pv-row, .pv.classic .pv-desc + .pv-row { border-top-color: #333; }
     .pv.classic .pv-time {
-      font-size: 12px; font-weight: 700; color: #FF0033;
-      background: rgba(255,0,51,0.2); border-radius: 16px;
-      padding: 4px 8px; margin-right: 8px; min-width: 0;
+      font-size: 12px; font-weight: 700; color: #FF0033; background: rgba(255,0,51,0.2);
+      border-radius: 16px; padding: 4px 8px; margin-right: 8px; min-width: 0; text-align: left;
     }
+    .pv.classic .pv-row.open .pv-time { background: rgba(255,0,51,0.2); color: #FF0033; }
+    .pv.classic .pv-row.now { background: #262626; border-color: #FF0033; box-shadow: none; }
+    .pv.classic .pv-row.now .pv-time { background: #FF0033; color: #fff; }
+    .pv.classic .pv-row.now .pv-time::before { display: none; }
+    .pv.classic .pv-row.now .pv-timetext { transform: none; }
+    .pv.classic .pv-row.now::after { height: 2px; background: #FF0033; opacity: 0.75; }
     .pv.classic .pv-t { font-size: 14px; font-weight: 500; color: #fff; }
-    .pv.classic .pv-chev { display: none; }
-    .pv-plus { display: none; }
-    .pv.classic .pv-plus {
-      display: block; flex: 0 0 auto; color: #888; font-size: 16px;
-      line-height: 1; margin-left: 10px;
-    }
+    .pv.classic .pv-plus { font-size: 16px; font-weight: 700; color: #888; padding: 8px 12px; line-height: normal; }
+    .pv.classic .pv-plus::after { display: none; }
     .pv.classic .pv-desc {
-      margin: 0 0 6px; padding: 10px 13px; border-left: 0;
-      background: #151515; border: 1px solid #2a2a2a; border-radius: 8px;
-      font-size: 12.5px; color: #b8b8b8;
+      background: #262626; border: 1px solid #333; border-top: 0; border-radius: 0 0 6px 6px;
+      margin: 0 0 6px; padding: 12px 14px; font-size: 14px; line-height: 1.6; color: #c4bebe;
     }
-    .pv.classic .pv-more { border-top: 1px solid #333; margin: 0 12px; padding: 10px 0 12px; }
+    .pv.classic .pv-more { padding: 12px 0 0; margin-top: 8px; border-top: 1px solid #333; }
 
-    /* Original in light: its own palette, from content.css's yt-theme-light
-       block. Without this the classic surfaces stay dark while the type tokens
-       go light, and the rows render as unreadable dark-on-dark. */
-    .pv.classic.lt { --s: #ffffff; --bd: #e5e5e5; }
-    .pv.classic.lt .pv-head b { color: #0f0f0f; }
-    .pv.classic.lt .pv-startover, .pv.classic.lt .pv-link { color: #606060; }
-    .pv.classic.lt .pv-collapse { border-color: #606060; }
-    .pv.classic.lt .pv-brief { background: #fafafa; border-color: #e5e5e5; }
-    .pv.classic.lt .pv-text { color: #0f0f0f; }
-    .pv.classic.lt .pv-rail { border-top-color: #e5e5e5; color: #909090; }
+    /* Original in light is not the dark panel lightened: content.css turns the
+       header into a solid red bar and drops the shell to grey with white cards
+       on top, the way YouTube's own light side panels work. */
+    .pv.classic.lt { --s: #f2f2f2; --bd: #dcdcdc; }
+    .pv.classic.lt .pv-head { background: #e41d1d; border-bottom: 1px solid #d2d2d2; }
+    .pv.classic.lt .pv-head b { color: #fcfcfc; }
+    .pv.classic.lt .pv-startover { color: #fff; opacity: 0.9; border-color: rgba(255,255,255,0.35); }
+    .pv.classic.lt .pv-collapse { color: #fcfcfc; }
+    .pv.classic.lt .pv-gist { border-bottom-color: #d4d4d4; }
+    .pv.classic.lt .pv-brief { background: #fbfbfb; border-color: #e0dcdc; }
+    .pv.classic.lt .pv-eyebrow { color: #757575; }
+    .pv.classic.lt .pv-text { color: #212121; }
+    .pv.classic.lt .pv-rail { border-top-color: #e4e0e0; color: #767676; }
     .pv.classic.lt .pv-rail b { color: #3f3f3f; }
-    .pv.classic.lt .pv-sec { color: rgba(0,0,0,0.45); border-bottom-color: #e0e0e0; }
+    .pv.classic.lt .pv-link { color: #606060; }
+    .pv.classic.lt .pv-dot { color: #b0b0b0; }
+    .pv.classic.lt .pv-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #3f3f3f; }
+    .pv.classic.lt .pv-sec { color: rgba(0,0,0,0.5); border-bottom-color: #d4d4d4; }
     .pv.classic.lt .pv-row { background: #fbfbfb; border-color: #e0e0e0; }
-    .pv.classic.lt .pv-row.open { border-color: #cc0000; }
+    .pv.classic.lt .pv-row + .pv-row, .pv.classic.lt .pv-desc + .pv-row { border-top-color: #e0e0e0; }
     .pv.classic.lt .pv-time { color: #FF0033; background: rgba(255,0,51,0.08); }
     .pv.classic.lt .pv-t { color: #525151; }
-    .pv.classic.lt .pv-row.open .pv-t { color: #0f0f0f; }
-    .pv.classic.lt .pv-desc { background: #fafafa; border-color: #e8e8e8; color: #5a5a5a; }
-    .pv.classic.lt .pv-acts .pv-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); color: #0f0f0f; }
-    .pv.classic.lt .pv-plus { color: #9a9a9a; }
-    .pv.classic.lt .pv-more { border-top-color: #e5e5e5; }
+    .pv.classic.lt .pv-row.open { background: #f0e3e3; }
+    .pv.classic.lt .pv-row.open .pv-t { color: #473b3b; }
+    .pv.classic.lt .pv-row.now { background: #fff4f4; border-color: #cc0000; }
+    .pv.classic.lt .pv-row.now .pv-time { background: #cc0000; color: #fff; }
+    .pv.classic.lt .pv-row.now .pv-t { color: #0f0f0f; }
+    .pv.classic.lt .pv-row.now::after { background: #cc0000; }
+    .pv.classic.lt .pv-plus { color: #606060; }
+    .pv.classic.lt .pv-desc { background: #faf6f6; border-color: #e2cece; color: #515151; }
+    .pv.classic.lt .pv-more { border-top-color: #d4d4d4; }
 
     .bz-cap { margin-top: auto; padding-top: 18px; max-width: 412px; font-size: 11.5px; color: var(--bz-faint); line-height: 1.55; }
     .bz-cap b { color: var(--bz-mid); font-weight: 600; }
@@ -2900,16 +2914,6 @@
               </button>
             </div>
             <p class="bz-hint" id="detail-effect"></p>
-          </div>
-
-          <div class="sec">
-            <div class="bz-row">
-              <div class="bz-row-t">
-                <b>Open with a gist</b>
-                <span>Two or three sentences saying what the video is about, above the timestamps.</span>
-              </div>
-              <button type="button" class="bz-sw" id="gist-toggle" role="switch" aria-checked="true" aria-label="Open with a gist"></button>
-            </div>
           </div>
         </div>
 

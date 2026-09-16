@@ -689,7 +689,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   let prefDetail = 'standard';
-  let prefGist = true;
   let prefTheme = 'system';
   let prefSkin = 'quiet';
 
@@ -712,10 +711,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
   };
 
-  // A miniature of the real panel: same surfaces, same type sizes, same
-  // structure. The two skins do not merely restyle one layout — Original puts
-  // the detail chip and the actions inside the overview card and titles the
-  // header with the extension's own name, so each is built on its own terms.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const svg = (tag, attrs) => {
+    const n = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    return n;
+  };
+
+  // The two glyphs the panel draws as SVG. Copied path-for-path from
+  // ui-builder.js so the miniature does not approximate them with borders.
+  function undoIcon() {
+    const node = svg('svg', { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round', 'aria-hidden': 'true' });
+    node.append(svg('path', { d: 'M9 14 4 9l5-5' }),
+      svg('path', { d: 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11' }));
+    return node;
+  }
+
+  function caretIcon() {
+    const node = svg('svg', { width: 8, height: 5, viewBox: '0 0 10 6', fill: 'none',
+      'aria-hidden': 'true' });
+    node.append(svg('path', { d: 'M1 1l4 4 4-4', stroke: 'currentColor', 'stroke-width': 1.6,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    return node;
+  }
+
+  // A miniature of the real panel. The two skins restyle one layout rather than
+  // each bringing their own, so this builds that one layout — header, overview
+  // card, sections, rows — and lets the .pv CSS do the same job skin-quiet.css
+  // does over content.css. The first point is both playing and open, which is
+  // the state the panel spends most of a video in.
   function renderPreview(host, { light }) {
     if (!host) return;
     const level = DETAIL_META[prefDetail] ? prefDetail : 'standard';
@@ -726,77 +752,66 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ---- header ----
     const head = el('div', 'pv-head');
-    if (classic) {
-      head.append(el('b', null, 'Timestamped Summary'));
-      const over = el('span', 'pv-startover');
-      over.append(el('i', 'pv-undo'), 'Start over');
-      head.append(over, el('span', 'pv-collapse'));
-    } else {
-      head.append(el('b', null, 'Summary'));
-      const chip = el('span', 'pv-chip');
-      chip.append(DETAIL_META[level].label, el('i', null, '▾'));
-      head.append(chip);
-    }
+    const left = el('div', 'pv-headleft');
+    const over = el('span', 'pv-startover');
+    over.append(undoIcon(), el('span', null, 'Start over'));
+    left.append(el('b', null, 'Timestamped Summary'), over);
+    head.append(left, el('span', 'pv-collapse', '›'));
     pv.append(head);
 
+    const list = el('div', 'pv-list');
+
     // ---- overview card ----
-    if (prefGist) {
-      const gist = el('div', 'pv-gist');
-      const brief = el('div', 'pv-brief');
-      brief.append(el('p', 'pv-eyebrow', 'Overview'), el('p', 'pv-text', PREVIEW_GIST));
+    const gist = el('div', 'pv-gist');
+    const brief = el('div', 'pv-brief');
+    brief.append(el('p', 'pv-eyebrow', 'Overview'), el('p', 'pv-text', PREVIEW_GIST));
 
-      const rail = el('div', 'pv-rail');
-      if (classic) {
-        // Original prints runtime, point count and a read estimate together.
-        const runtime = el('span');
-        runtime.append(el('b', null, clockLong(PREVIEW_MINUTES)), ' video');
-        const pts = el('span');
-        pts.append(el('b', null, String(shape.target)), ' points');
-        const read = el('span');
-        read.append(el('b', null, `${readMinutes(level, shape.target)} min`), ' read');
-        rail.append(runtime, pts, read);
-      } else {
-        const pts = el('span');
-        pts.append(el('b', null, String(shape.target)), ' points');
-        rail.append(pts, el('span', null, `${PREVIEW_MINUTES} min`));
-      }
-      brief.append(rail);
-
-      if (classic) {
-        // and carries its actions plus the detail chip under the numbers.
-        const acts = el('div', 'pv-acts');
-        acts.append(el('span', 'pv-link', 'Show more'), el('span', 'pv-dot', '·'), el('span', 'pv-link', 'Copy'));
-        const chip = el('span', 'pv-chip');
-        chip.append(DETAIL_META[level].label, el('i', null, '⌄'));
-        acts.append(chip);
-        brief.append(acts);
-      }
-
-      gist.append(brief);
-      pv.append(gist);
+    const rail = el('div', 'pv-rail');
+    const stats = [
+      [clockLong(PREVIEW_MINUTES), 'video'],
+      [String(shape.target), shape.target === 1 ? 'point' : 'points'],
+      [`${readMinutes(level, shape.target)} min`, 'read']
+    ];
+    for (const [value, name] of stats) {
+      const stat = el('span', 'pv-stat');
+      stat.append(el('b', null, value), ` ${name}`);
+      rail.append(stat);
     }
+    brief.append(rail);
 
-    pv.append(el('div', 'pv-sec', 'The economics of inference'));
+    const acts = el('div', 'pv-acts');
+    acts.append(el('span', 'pv-link', 'Show more'), el('span', 'pv-dot', '·'),
+      el('span', 'pv-link', 'Copy'));
+    const chip = el('span', 'pv-chip');
+    chip.append(el('span', null, DETAIL_META[level].label), caretIcon());
+    acts.append(chip);
+    brief.append(acts);
 
-    const body = el('div', 'pv-body');
+    gist.append(brief);
+    list.append(gist);
+
+    list.append(el('div', 'pv-sec', 'The economics of inference'));
+
     for (let i = 0; i < shape.rows; i += 1) {
       const point = PREVIEW_POINTS[i];
       const open = i === 0;
-      const row = el('div', `pv-row${open ? ' open' : ''}`);
+      const row = el('div', `pv-row${open ? ' open now' : ''}`);
       // 0.7min in, then one point per gap — the spacing itself shows density.
-      row.append(el('span', 'pv-time', clockAt(0.7 + i * shape.gap)));
+      const time = el('span', 'pv-time');
+      time.append(el('span', 'pv-timetext', clockAt(0.7 + i * shape.gap)));
+      row.append(time);
       row.append(el('span', 'pv-t', point.title));
-      row.append(el('span', 'pv-chev'), el('span', 'pv-plus', open ? '−' : '+'));
-      body.append(row);
-      if (open) body.append(el('div', 'pv-desc', point[level]));
+      row.append(el('span', 'pv-plus', open ? '−' : '+'));
+      list.append(row);
+      if (open) list.append(el('div', 'pv-desc', point[level]));
     }
-    pv.append(body);
 
     const remaining = shape.target - shape.rows;
     if (remaining > 0) {
-      pv.append(el('div', 'pv-more', `+ ${remaining} more point${remaining === 1 ? '' : 's'}`));
+      list.append(el('div', 'pv-more', `+ ${remaining} more point${remaining === 1 ? '' : 's'}`));
     }
 
+    pv.append(list);
     host.replaceChildren(pv);
   }
 
@@ -908,28 +923,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.storage.local.set({ SUMMARY_LENGTH: pref });
         showToast(`New summaries: ${o.dataset.label}`);
       });
-    });
-  }
-
-  // --- Open with a gist ---
-  //
-  // The overview line is always written (the prompt and validator both require
-  // it, and it travels inside the saved summary text), so this is a display
-  // preference: turning it off hides the paragraph in the panel, and turning it
-  // back on costs nothing because the text is already there.
-  const gistToggle = document.getElementById('gist-toggle');
-  if (gistToggle) {
-    const setGist = (on) => {
-      prefGist = on !== false;
-      gistToggle.setAttribute('aria-checked', prefGist ? 'true' : 'false');
-      refreshPreviews();
-    };
-    chrome.storage.local.get(['SHOW_GIST'], (res) => setGist(res.SHOW_GIST !== false));
-    gistToggle.addEventListener('click', () => {
-      const next = gistToggle.getAttribute('aria-checked') !== 'true';
-      setGist(next);
-      chrome.storage.local.set({ SHOW_GIST: next });
-      showToast(next ? 'Summaries open with a gist' : 'Gist hidden');
     });
   }
 

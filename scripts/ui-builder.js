@@ -53,7 +53,6 @@ const PANEL_PREF_DEFAULTS = {
     summaryLength: 'standard',
     theme: 'system',
     skin: 'quiet',
-    showGist: true,
     providerReady: false
 };
 let _panelPrefs = { ...PANEL_PREF_DEFAULTS };
@@ -96,10 +95,6 @@ function applyPanelPrefs(prefs) {
     _panelPrefs = { ...PANEL_PREF_DEFAULTS, ...prefs };
     if (_panelPrefs.theme !== previous.theme) setPanelThemePref(_panelPrefs.theme);
     if (_panelPrefs.skin !== previous.skin) setPanelSkinPref(_panelPrefs.skin);
-    if (_panelPrefs.showGist !== previous.showGist) {
-        document.querySelectorAll('.yt-gist').forEach((el) =>
-            el.classList.toggle('yt-gist-off', _panelPrefs.showGist === false));
-    }
     // Saving a key in the other tab flips this panel on its own.
     if (_panelPrefs.providerReady !== previous.providerReady) refreshGenerateButtonMode();
 }
@@ -1889,10 +1884,6 @@ function buildBriefingCard({ overview, meta, points, summaryText }) {
 
     const card = document.createElement('div');
     card.className = 'yt-brief';
-    // The overview travels inside the summary text, so hiding it is a class on
-    // the block rather than a rebuild — flipping the setting is instant, and
-    // turning it back on never costs another request.
-    if (_panelPrefs.showGist === false) block.classList.add('yt-gist-off');
 
     if (overview) {
         const eyebrow = document.createElement('span');
