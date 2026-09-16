@@ -15,6 +15,42 @@ class OpenAICompatibleClient extends LLMClient {
     this.modelId = providerConfig?.defaultModel || 'gpt-4o-mini';
   }
 
+  // Model ids that no longer take the classic Chat Completions body. OpenAI's
+  // o-series and everything from GPT-5 on replaced `max_tokens` with
+  // `max_completion_tokens` and reject a `temperature` other than the default;
+  // sending the old shape to one of them fails the entire generation with a
+  // 400. Picking one of these from the model dropdown used to break every
+  // summary, and the fallback chain can land on one too.
+  static NEW_PARAM_MODEL = /^(o\d|gpt-[56789]|gpt-\d\d)/i;
+
+  // The request body this model will accept.
+  //
+  // Only applied to the built-in OpenAI provider. A custom endpoint is some
+  // other server speaking OpenAI's dialect, and `max_tokens` is the shape all
+  // of them understand — guessing the new one at a local model server would
+  // trade a bug we know about for one we don't.
+  buildBody(model, prompt, maxTokens) {
+    const body = {
+      model,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    };
+    if (!this.providerConfig?.isCustom && OpenAICompatibleClient.NEW_PARAM_MODEL.test(model)) {
+      body.max_completion_tokens = maxTokens;
+      return body;
+    }
+    // An output budget sized from the density this run asked for, so long
+    // In-depth summaries aren't truncated mid-list; low temperature steadies
+    // the point count run-to-run.
+    body.max_tokens = maxTokens;
+    body.temperature = 0.3;
+    return body;
+  }
+
   async callAPI(apiKey, transcript, options = {}) {
     const prompt = `${composeSummaryPrompt(options)}
 
@@ -40,20 +76,7 @@ Here is the transcript: ${transcript}`;
       // Carries the caller's cancellation: navigating away or superseding the
       // request stops the call instead of leaving it running to completion.
       signal: options.signal,
-      body: JSON.stringify({
-        model: selectedModel,
-        // An output budget sized from the density this run asked for, so long
-        // In-depth summaries aren't truncated mid-list; low temperature
-        // steadies the point count run-to-run.
-        max_tokens: outputBudgetFor(options),
-        temperature: 0.3,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      })
+      body: JSON.stringify(this.buildBody(selectedModel, prompt, outputBudgetFor(options)))
     });
 
     const text = await response.text();
@@ -119,11 +142,9 @@ Here is the transcript: ${transcript}`;
       const res = await fetch(this.endpoint, {
         method: "POST",
         headers: headers,
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: "." }],
-          max_tokens: 1 // Just a quick check
-        })
+        // Just a quick check — but in whichever body shape this model takes,
+        // or a perfectly good key comes back looking rejected.
+        body: JSON.stringify(this.buildBody(model, ".", 1))
       });
       if (res.ok) return { status: 'valid', model };
       if (res.status === 401 || res.status === 403) return { status: 'invalid', model };

@@ -42,6 +42,12 @@ export const PROVIDERS = {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o-mini',
     defaultModelName: 'GPT-4o mini',
+    // Tried in order when the default is not in the key's own model listing.
+    // A key whose organisation has moved on from the 4o generation should land
+    // on the current cost-optimised model, not on whichever id the provider
+    // happened to return first. Current models only — a fallback onto
+    // something retired just moves the failure to the first summary.
+    preferredModels: ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-4.1-mini'],
     svgIcon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>`,
     cssClass: 'openai',
     helpTitle: 'How to get your OpenAI API key',
@@ -61,6 +67,9 @@ export const PROVIDERS = {
     endpoint: 'https://api.anthropic.com/v1/messages',
     defaultModel: 'claude-haiku-4-5-20251001',
     defaultModelName: 'Claude Haiku 4.5',
+    // Haiku 4.5 is the cheapest current Claude; the rest of the chain steps up
+    // the current lineup rather than back into a retired generation.
+    preferredModels: ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'],
     svgIcon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg>`,
     cssClass: 'anthropic',
     helpTitle: 'How to get your Anthropic API key',
@@ -79,9 +88,46 @@ export const PROVIDERS = {
 // These patterns mark such values so the background can migrate them to the
 // provider's current default on update. Only the built-in providers appear
 // here: a custom endpoint's model list is the user's own to maintain.
+//
+// A model with an announced shutdown counts as retired here. Waiting for the
+// date to pass means the migration lands the release *after* summaries start
+// failing, which is the wrong way round.
+//
+// Every pattern is anchored and deliberately narrow, because the cost of a
+// false positive is silently moving someone off a model that still works. The
+// point releases matter: `claude-opus-4-1` is retired while `claude-opus-4-5`
+// is current, and `gpt-4-0613` is gone while `gpt-4.1` is not.
 export const RETIRED_MODEL_PATTERNS = {
   gemini: [/^gemini-1\.0/i, /^gemini-1\.5/i, /^gemini-pro$/i, /^gemini-pro-vision/i],
-  anthropic: [/^claude-instant/i, /^claude-2/i, /^claude-3-(haiku|sonnet|opus)/i, /^claude-3-5-(haiku|sonnet)/i]
+  anthropic: [
+    /^claude-1[.-]/i,
+    /^claude-instant/i,
+    /^claude-2/i,
+    /^claude-3-(haiku|sonnet|opus)/i,
+    /^claude-3-5-(haiku|sonnet)/i,
+    /^claude-3-7-sonnet/i,
+    // Claude 4.0 and 4.1, by alias or by snapshot. 4.5 and later are current,
+    // so these must not match `claude-opus-4-5` or `claude-sonnet-4-6`.
+    /^claude-(opus|sonnet)-4(-0)?$/i,
+    /^claude-(opus|sonnet)-4-20\d{6}$/i,
+    /^claude-opus-4-1(-|$)/i
+  ],
+  openai: [
+    // The completions era, long gone.
+    /^(text-)?(davinci|curie|babbage|ada)/i,
+    /^code-davinci/i,
+    /^gpt-3\.5/i,
+    // Dated GPT-4 snapshots and the 32k/vision variants. `gpt-4o` and
+    // `gpt-4.1` do not match: neither is followed by `-32k`, `-vision` or a
+    // four-digit date.
+    /^gpt-4(-32k|-vision|-\d{4})/i,
+    /^gpt-4o-2024-05-13$/i,
+    // GPT-5.0 snapshots and the rolling chat aliases, all with announced
+    // shutdown dates. `gpt-5.6-luna` and friends are current and unmatched.
+    /^gpt-5(-mini|-nano|-pro)?-20\d{2}-\d{2}-\d{2}$/i,
+    /^gpt-5(\.\d)?-chat-latest$/i,
+    /^o[134](-mini|-preview)?-20\d{2}-\d{2}-\d{2}$/i
+  ]
 };
 
 // Providers that used to be built in, and the settings they leave behind.
@@ -102,6 +148,44 @@ export function isRetiredModel(providerId, modelId) {
   const patterns = RETIRED_MODEL_PATTERNS[providerId];
   if (!patterns || !modelId) return false;
   return patterns.some((pattern) => pattern.test(modelId));
+}
+
+// Choose the model to configure from what a key can actually reach.
+//
+// Reached whenever the provider's own default is missing from a key's listing —
+// a restricted plan, an organisation that has moved past that generation, or a
+// model retired since this release shipped. The answer has to be something the
+// key can use *and* something worth using: picking `models[0]` meant whichever
+// id the provider happened to return first, which on OpenAI is neither the
+// cheapest nor the newest, and on any provider might be something already
+// retired.
+//
+// Order of preference: the provider's default, then its declared chain, then a
+// cheap-tier name hint, then anything left. Retired ids are dropped before the
+// hint stage, so a fallback never lands on a model that is on its way out.
+const CHEAP_TIER_HINTS = ['flash-lite', 'flash', 'nano', 'luna', 'mini', 'small', 'haiku', 'lite'];
+
+export function pickModel(ids, provider) {
+  const list = (Array.isArray(ids) ? ids : [])
+    .map((m) => (typeof m === 'string' ? m : m?.id))
+    .filter(Boolean);
+  if (!list.length) return provider?.defaultModel || '';
+
+  for (const id of [provider?.defaultModel, ...(provider?.preferredModels || [])]) {
+    if (id && list.includes(id)) return id;
+  }
+
+  // Prefer models with a future. Only if *everything* on offer is retired does
+  // the search fall back to the full list, because a retired model that still
+  // answers beats no model at all.
+  const current = list.filter((id) => !isRetiredModel(provider?.id, id));
+  const pool = current.length ? current : list;
+
+  for (const hint of CHEAP_TIER_HINTS) {
+    const hit = pool.find((id) => id.toLowerCase().includes(hint));
+    if (hit) return hit;
+  }
+  return pool[0];
 }
 
 // How a model is named to a person. The registry's friendly name is used when

@@ -1,6 +1,6 @@
 // options/options.js
 
-import { PROVIDERS, normalizeEndpoint, endpointOrigin, detectKeyProvider, modelLabel, configuredProviders } from '../scripts/providers.js';
+import { PROVIDERS, normalizeEndpoint, endpointOrigin, detectKeyProvider, modelLabel, configuredProviders, pickModel } from '../scripts/providers.js';
 import { densityFor } from '../scripts/constants.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 
@@ -486,8 +486,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           || (p.defaultModelName && modelsList.find(m => m.name === p.defaultModelName));
       }
 
+      // Same choice the setup flow and the save path make, rather than
+      // whichever id the provider happened to list first.
       if (!targetModel && modelsList.length > 0) {
-        targetModel = modelsList[0];
+        const picked = pickModel(modelsList, p);
+        targetModel = modelsList.find((m) => m.id === picked) || modelsList[0];
       }
     }
 
@@ -1101,11 +1104,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     let savedMessage = `${p.name} key saved`;
 
     if (result.status === 'model_unavailable') {
-      // The key works; the model it was checked against does not. Replace the
-      // saved id with the current default so generation isn't left pointing at
-      // a model the provider has retired, and say which one failed.
-      updates[`${p.id}_MODEL`] = p.defaultModel;
-      savedMessage = `Key saved — ${result.model} is unavailable, so pick another model`;
+      // The key works; the model it was checked against does not. Saving the
+      // provider's default here was the bug: the model just checked normally
+      // *is* the default, so this wrote back the very id that had failed and
+      // told the user to go and fix it themselves. Validation hands back the
+      // models the key can reach, so pick one of those — the same choice
+      // first-run setup makes, so the two paths agree.
+      const reachable = (result.models || [])
+        .map((m) => (typeof m === 'string' ? m : m.id))
+        .filter(Boolean);
+      const replacement = reachable.length ? pickModel(reachable, p) : p.defaultModel;
+      updates[`${p.id}_MODEL`] = replacement;
+      savedMessage = replacement && replacement !== result.model
+        ? `Key saved — ${result.model} isn't available to this key, so ${replacement} is set instead`
+        : `Key saved — ${result.model} is unavailable, so pick another model`;
     } else if (!stored[`${p.id}_MODEL`]) {
       const defaultVal = p.modelSelect?.value || p.defaultModel;
       if (defaultVal) updates[`${p.id}_MODEL`] = defaultVal;
@@ -1468,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const id = 'custom_' + Date.now();
-    const defaultModel = modelsList ? modelsList.split(',')[0].trim() : 'gpt-3.5-turbo';
+    const defaultModel = modelsList ? modelsList.split(',')[0].trim() : '';
 
     const newProvider = {
       id: id,
@@ -1940,7 +1952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .map((m) => (typeof m === 'string' ? m : m.id))
             .filter(Boolean);
           if (ids.length) {
-            model = pickModel(ids, provider.defaultModel);
+            model = pickModel(ids, provider);
             substituted = true;
           }
         }
@@ -1968,18 +1980,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           `Only part of the key was copied — yours is ${key.length} characters.`,
           'The key belongs to an account or project where this model is not enabled.'
         ]);
-    }
-
-    // The built-in defaults are all flash/mini/small-class models, so when a
-    // substitute is needed, pick from the same end of the range rather than
-    // silently signing someone up to the most expensive model they can reach.
-    function pickModel(ids, preferred) {
-      if (ids.includes(preferred)) return preferred;
-      for (const hint of ['flash-lite', 'flash', 'mini', 'small', 'haiku', 'lite']) {
-        const hit = ids.find((id) => id.toLowerCase().includes(hint));
-        if (hit) return hit;
-      }
-      return ids[0];
     }
 
     // --- screen 3: the payoff -------------------------------------------

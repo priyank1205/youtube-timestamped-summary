@@ -1,7 +1,5 @@
 // scripts/llm-client.js
 
-import { ERROR_CODES } from './errors.js';
-
 /**
  * Abstract class representing a Language Model Client
  */
@@ -107,8 +105,13 @@ export class LLMClient {
     try {
       models = await this.fetchModels(apiKey);
     } catch (err) {
-      // The provider actively refused the credentials: that is an answer.
-      if (err?.code === ERROR_CODES.AUTH) return { status: 'invalid', model };
+      // 401 is the provider saying the credential itself is bad, which is an
+      // answer. Nothing else here is. A restricted key that simply lacks the
+      // model-listing scope is refused with 403 and still generates perfectly
+      // well, and Gemini answers a bad key with 400 — a status a malformed
+      // request shares. Both fall through to the caller's own probe, which
+      // asks the question that actually matters.
+      if (err?.status === 401) return { status: 'invalid', model };
       return null;
     }
     if (!Array.isArray(models) || !models.length) return null;

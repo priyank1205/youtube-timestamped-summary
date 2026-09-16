@@ -12,6 +12,35 @@ class AnthropicClient extends LLMClient {
     this.modelId = providerConfig?.defaultModel || 'claude-haiku-4-5-20251001';
   }
 
+  // Generations that still accept `temperature`.
+  //
+  // Anthropic deprecated `temperature`, `top_p` and `top_k` from Claude Opus
+  // 4.7 on, where a non-default value is a 400 that fails the whole request.
+  // This is an allow-list rather than a list of the models that reject it, so
+  // that the next model released is quiet by default instead of erroring: the
+  // worst an unlisted model gets is Anthropic's own sampling default, which
+  // summarises perfectly well.
+  static ACCEPTS_TEMPERATURE = /^claude-(3|haiku-4-5|sonnet-4-[56]|opus-4-[56])/i;
+
+  buildBody(model, prompt, maxTokens) {
+    const body = {
+      model,
+      // Sized from the density this run asked for: an In-depth summary of a
+      // long video needs far more room than a brief one, and a reply cut off
+      // mid-list is thrown away by the validator.
+      max_tokens: maxTokens,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    };
+    // Low temperature steadies the point count run-to-run, where it is taken.
+    if (AnthropicClient.ACCEPTS_TEMPERATURE.test(model)) body.temperature = 0.3;
+    return body;
+  }
+
   async callAPI(apiKey, transcript, options = {}) {
     const prompt = `${composeSummaryPrompt(options)}
 
@@ -30,20 +59,7 @@ Here is the transcript: ${transcript}`;
       // Carries the caller's cancellation: navigating away or superseding the
       // request stops the call instead of leaving it running to completion.
       signal: options.signal,
-      body: JSON.stringify({
-        model: selectedModel,
-        // Sized from the density this run asked for: an In-depth summary of a
-        // long video needs far more room than a brief one, and a reply cut off
-        // mid-list is thrown away by the validator.
-        max_tokens: outputBudgetFor(options),
-        temperature: 0.3,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      })
+      body: JSON.stringify(this.buildBody(selectedModel, prompt, outputBudgetFor(options)))
     });
 
     const result = await response.json();
@@ -89,11 +105,7 @@ Here is the transcript: ${transcript}`;
           "anthropic-version": "2023-06-01",
           "anthropic-dangerously-allow-browser": "true"
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: "." }],
-          max_tokens: 1
-        })
+        body: JSON.stringify(this.buildBody(model, ".", 1))
       });
       if (res.ok) return { status: 'valid', model };
       if (res.status === 401 || res.status === 403) return { status: 'invalid', model };
@@ -116,7 +128,13 @@ Here is the transcript: ${transcript}`;
   async fetchModels(apiKey) {
     let res;
     try {
-      res = await fetch('https://api.anthropic.com/v1/models', {
+      // `limit` matters more than it looks. The listing is ordered newest
+      // first and defaults to 20 per page, and the models released since
+      // Claude Haiku 4.5 already fill over half of that page. Left unset, the
+      // default model would eventually fall off page one and a working key
+      // would be told its own default is unavailable. 1000 is the documented
+      // maximum and puts every model the key can reach in one response.
+      res = await fetch('https://api.anthropic.com/v1/models?limit=1000', {
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
