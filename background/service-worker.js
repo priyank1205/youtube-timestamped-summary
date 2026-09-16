@@ -6,6 +6,7 @@ import { getPlayerCaptions } from '../scripts/caption-reader.js';
 import { apiError, classifyError, ERROR_CODES } from '../scripts/errors.js';
 import { parseTranscriptCues, unwrap, validateSummary } from '../scripts/summary-validator.js';
 import { planWindows } from '../scripts/transcript-windows.js';
+import { detailEstimate } from '../scripts/constants.js';
 
 // Content scripts can read chrome.storage.local by default, and this store
 // holds every provider API key. The panel is a content script: it runs in
@@ -339,7 +340,7 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
 }
 
 // Delight stats: record one successful summary and the few figures the
-// Statistics screen draws from. "Saved" = the video's length minus the time to
+// "Your usage" screen draws from. "Saved" = the video's length minus the time to
 // read the summary at READING_WPM, clamped at zero (a summary can't cost more
 // than the video).
 //
@@ -577,6 +578,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse(null);
     });
     return true;
+  }
+  if (request.action === "GET_DETAIL_ESTIMATE") {
+    // The panel draws its density field from these counts. The arithmetic lives
+    // in constants.js beside the prompt that consumes it, so the picture the
+    // panel shows and the request it will send can't drift apart.
+    if (!isYouTubeTopFrame(sender)) return;
+    sendResponse(detailEstimate(request.durationMinutes));
+    return;
   }
   if (request.action === "SET_PANEL_PREF") {
     if (isYouTubeTopFrame(sender)) {

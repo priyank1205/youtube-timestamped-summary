@@ -1,5 +1,7 @@
 // scripts/constants.js
 
+import { WINDOW_TARGET_MINUTES, WINDOW_THRESHOLD_MINUTES } from './transcript-windows.js';
+
 // Shared selectors and config
 const CONSTANTS = {
   TRANSCRIPT: {
@@ -60,6 +62,12 @@ const CONSTANTS = {
       standard: `Create 10–20 summary points, scaled to the video's length (roughly one every 3–5 minutes). Keep each description to 1–2 sentences summarizing the key idea. Group the points under about 2–4 section headings, never fewer than 2.`,
       detailed: `Create a fine-grained set of summary points that marks every distinct topic or subtopic, at roughly one point every 1–2 minutes for the whole runtime — a one-hour video earns 30 or more points and a two-hour video 60 or more. There is no upper limit: keep that density all the way to the end rather than compressing the later parts. Write 2–4 sentences per description, preserving concrete specifics mentioned: names, numbers, examples, definitions, and conclusions. A reader should not need to watch the video. Group the points under several section headings, never fewer than 2.`
     },
+
+    // The point counts the static directives above actually ask for, in the shape
+    // densityFor returns. The panel's density field reads these when the video's
+    // duration can't be read, so the picture it draws is never a second estimate
+    // that disagrees with the prompt the request will send.
+    LENGTH_PRESET_COUNTS: { brief: 6, standard: 15, detailed: 30 },
 
     // Output-language directives (forward-design for a later slice). Empty string =
     // no instruction = the model's default (English). New languages drop in here.
@@ -258,6 +266,37 @@ export function densityFor(preset, durationMinutes) {
   // contents; a handful of points doesn't need splitting at all.
   const sections = clamp(Math.round(target / 5), target < 4 ? 1 : 2, 24);
   return { target, lo, hi, sections, depth: model.depth };
+}
+
+// The point count each Detail level would ask for on this video, for the panel's
+// density field. It exists so the field and the prompt can never disagree: both
+// are this arithmetic. `exact` is false when the duration was unreadable and the
+// static fallback counts were used instead.
+export function detailEstimate(durationMinutes) {
+  const presets = ['brief', 'standard', 'detailed'];
+  const usable = typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) && durationMinutes > 0;
+  if (!usable) return { exact: false, targets: { ...CONSTANTS.PROMPTS.LENGTH_PRESET_COUNTS } };
+  const targets = {};
+  for (const preset of presets) {
+    targets[preset] = estimateWindowMinutes(durationMinutes)
+      .reduce((sum, minutes) => sum + densityFor(preset, minutes).target, 0);
+  }
+  return { exact: true, targets };
+}
+
+// The runtimes the requests will actually be priced on. A long video isn't
+// summarised in one call: planWindows cuts it up and each window is priced on
+// its own length, so the count the run asks for is the sum of the windows'
+// counts. That is not the same as pricing the whole runtime once — rounding
+// five times over 48 minutes and once over 240 give different answers.
+//
+// The real split measures the span between the first and last transcript cue;
+// here there is no transcript yet, so the video's runtime stands in for it.
+// Close, but one more reason the panel shows the count as approximate.
+function estimateWindowMinutes(durationMinutes) {
+  if (!(durationMinutes > WINDOW_THRESHOLD_MINUTES)) return [durationMinutes];
+  const count = Math.max(2, Math.round(durationMinutes / WINDOW_TARGET_MINUTES));
+  return new Array(count).fill(durationMinutes / count);
 }
 
 // Video-clock label for a position given in minutes, in the same shape the

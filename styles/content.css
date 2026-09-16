@@ -74,6 +74,19 @@
   margin-bottom: 24px;
 }
 
+/* While the Detail popover is open, the panel has to win the stacking contest
+   against YouTube's own sidebar chrome: the chip cloud's scroll arrows
+   (#right-arrow.yt-chip-cloud-renderer) paint over a z-index:50 popover, because
+   the container above it is position:relative with z-index:auto and so never
+   establishes a context for the popover to be raised inside of.
+   Raised here on the container, which does establish one, and only for as long
+   as the popover is open — a panel that outranked the page permanently would
+   start winning fights it has no business being in. Kept below YouTube's own
+   dialog layer (ytd-popup-container, 2202) so a real dialog still comes first. */
+.yt-timestamps-container.yt-detail-open {
+  z-index: 2100;
+}
+
 /* Panel Styles */
 .yt-timestamps-panel {
   position: relative;
@@ -618,16 +631,6 @@
   padding: 13px 14px 11px;
 }
 
-.yt-gist-eyebrow {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: #8a8a8a;
-  margin-bottom: 6px;
-}
-
 .yt-gist-text {
   margin: 0;
   font-size: 13px;
@@ -643,33 +646,6 @@
   display: block;
   overflow: visible;
   -webkit-line-clamp: none;
-}
-
-/* Rail: only figures the extension already has — the video's length, the points
-   that survived validation, and the reading time at 200 wpm. */
-.yt-brief-rail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  margin-top: 11px;
-  padding-top: 10px;
-  border-top: 1px solid #333;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: #8a8a8a;
-}
-
-/* First child when the model returned no overview: nothing to divide from. */
-.yt-brief-rail:first-child {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.yt-brief-stat b {
-  color: #c4bebe;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Detail level, next to the numbers it explains. Pressing it discloses the
@@ -993,14 +969,6 @@
   border-color: #e0dcdc;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-brief-rail {
-  border-top-color: #e4e0e0;
-  color: #767676;
-}
-
-.yt-timestamps-container.yt-theme-light .yt-brief-stat b {
-  color: #3f3f3f;
-}
 
 .yt-timestamps-container.yt-theme-light .yt-brief-detail {
   background: rgba(0, 0, 0, 0.05);
@@ -1021,10 +989,6 @@
 
 .yt-timestamps-container.yt-theme-light .yt-brief-meta {
   color: #767676;
-}
-
-.yt-timestamps-container.yt-theme-light .yt-gist-eyebrow {
-  color: #757575;
 }
 
 .yt-timestamps-container.yt-theme-light .yt-gist-text {

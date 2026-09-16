@@ -87,6 +87,13 @@
           setTimeout(() => updateGenerateButton('calling_api'), 600);
           setTimeout(() => renderTimestampsUI(SAMPLE_SUMMARY, meta), 2200);
           setTimeout(() => cb && cb({ success: true }), 2300);
+        } else if (msg && msg.action === 'GET_DETAIL_ESTIMATE') {
+          // The real function, not a copy of it: the Detail field's counts have
+          // to be the same arithmetic here as in the background, or the harness
+          // previews numbers the extension would never show.
+          import(`../scripts/constants.js?t=${Date.now()}`)
+            .then((m) => cb && cb(m.detailEstimate(msg.durationMinutes)))
+            .catch(() => cb && cb(null));
         } else if (cb) {
           if (msg && msg.action === 'CANCEL_ANALYSIS') window.__lastCancel = msg;
           cb({ success: true });

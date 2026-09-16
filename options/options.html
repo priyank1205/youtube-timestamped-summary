@@ -252,27 +252,6 @@
 
     .model-icon.openai { color: #fafafa; }
     
-    .delete-custom-btn {
-      background: none;
-      border: none;
-      color: #ef4444;
-      cursor: pointer;
-      padding: 4px;
-      margin-left: 8px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      transition: all 0.2s;
-    }
-    .delete-custom-btn:hover {
-      background: rgba(239, 68, 68, 0.1);
-    }
-    .delete-custom-btn svg {
-      width: 18px;
-      height: 18px;
-      fill: currentColor;
-    }
-
     .model-info {
       flex: 1;
     }
@@ -1673,10 +1652,13 @@
     }
     .su-btn:hover { filter: brightness(1.08); }
     .su-btn:disabled { background: var(--su-line); color: var(--su-faint); box-shadow: none; cursor: default; }
-    .su-btn.sec {
+    /* Named su-sec, not sec: `.sec` is the section layout class further down
+       this sheet, and `.sec:first-of-type { padding-top: 0 }` was winning the
+       specificity tie against the button's own padding. */
+    .su-btn.su-sec {
       background: var(--su-card); border-color: var(--su-line2); color: var(--su-ink); box-shadow: var(--su-sh1);
     }
-    .su-btn.sec:hover { filter: none; border-color: var(--su-faint); }
+    .su-btn.su-sec:hover { filter: none; border-color: var(--su-faint); }
 
     /* ---- the finish ----
        Two minutes of someone's attention were spent getting here, so arriving
@@ -2174,26 +2156,28 @@
 
     .pv-list { padding: 2px 0 10px; }
 
-    /* The overview card: .yt-gist wrapping .yt-brief. Same in both skins —
-       eyebrow, prose, the three stats, then the actions and the detail chip. */
+    /* The overview card: .yt-gist wrapping .yt-brief. The gist of the whole video
+       in a paragraph and nothing else — Quiet raises it as a slab with the
+       controls under a rule, Classic keeps its bordered card, exactly as the
+       panel does. */
     .pv-gist { padding: 12px 12px 14px; border-bottom: 1px solid var(--dv); }
-    .pv-brief { background: var(--raised); border: 1px solid var(--bd); border-radius: 10px; padding: 13px 14px 11px; }
-    .pv.lt .pv-brief { background: #fafafa; }
-    .pv-eyebrow {
-      font-size: 11px; font-weight: 500; letter-spacing: 0.7px; text-transform: uppercase;
-      color: var(--t3); margin: 0 0 8px;
+    .pv-brief {
+      background: var(--raised); border: 0; border-radius: 14px;
+      padding: 18px 17px 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.28);
+    }
+    .pv.lt .pv-brief {
+      background: #fbfbfb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05);
     }
     /* Clamped to three lines, which is what puts Show more there. */
     .pv-text {
-      font-size: 13px; line-height: 1.6; color: var(--t1); margin: 0;
+      font-size: 13.5px; line-height: 1.58; color: var(--t1); margin: 0;
       display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
     }
-    .pv-rail {
-      display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 11px; padding-top: 10px;
-      border-top: 1px solid var(--dv); font-size: 11.5px; line-height: 1.5; color: var(--t3);
+    .pv-acts {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--dv);
     }
-    .pv-rail b { color: var(--t2); font-weight: 500; }
-    .pv-acts { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .pv-link { font-size: 12px; line-height: 1.4; color: var(--t3); }
     .pv-dot { font-size: 12px; color: var(--t3); opacity: 0.6; }
     .pv-chip {
@@ -2266,13 +2250,12 @@
     .pv.classic .pv-collapse { font-size: 22px; font-weight: 700; color: #888; }
     .pv.classic .pv-list { padding: 0 14px 14px; }
     .pv.classic .pv-gist { padding: 12px 0; margin-bottom: 4px; border-bottom: 1px solid #333; }
-    .pv.classic .pv-brief { background: #171717; border-color: #333; }
-    .pv.classic .pv-eyebrow {
-      font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: #8a8a8a; margin-bottom: 6px;
+    .pv.classic .pv-brief {
+      background: #171717; border: 1px solid #333; border-radius: 10px;
+      padding: 13px 14px 11px; box-shadow: none;
     }
     .pv.classic .pv-text { color: #e0dcdc; }
-    .pv.classic .pv-rail { border-top-color: #333; color: #8a8a8a; }
-    .pv.classic .pv-rail b { color: #c4bebe; }
+    .pv.classic .pv-acts { margin-top: 8px; padding-top: 0; border-top: 0; }
     .pv.classic .pv-link { color: #8a8a8a; }
     .pv.classic .pv-dot { color: #5a5a5a; opacity: 1; }
     .pv.classic .pv-chip {
@@ -2316,10 +2299,7 @@
     .pv.classic.lt .pv-collapse { color: #fcfcfc; }
     .pv.classic.lt .pv-gist { border-bottom-color: #d4d4d4; }
     .pv.classic.lt .pv-brief { background: #fbfbfb; border-color: #e0dcdc; }
-    .pv.classic.lt .pv-eyebrow { color: #757575; }
     .pv.classic.lt .pv-text { color: #212121; }
-    .pv.classic.lt .pv-rail { border-top-color: #e4e0e0; color: #767676; }
-    .pv.classic.lt .pv-rail b { color: #3f3f3f; }
     .pv.classic.lt .pv-link { color: #606060; }
     .pv.classic.lt .pv-dot { color: #b0b0b0; }
     .pv.classic.lt .pv-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #3f3f3f; }
@@ -2544,12 +2524,6 @@
       transition: background .14s ease, border-color .14s ease;
     }
     #pane-ai .card-edit:hover { background: linear-gradient(#31313c, #24242d); border-color: #45454f; }
-    #pane-ai .delete-custom-btn {
-      flex: 0 0 auto; background: none; border: 0; color: #5f5f68; cursor: pointer;
-      padding: 7px; border-radius: 8px; display: grid; place-items: center;
-    }
-    #pane-ai .delete-custom-btn:hover { color: var(--bz-hot); background: rgba(224,112,95,0.1); }
-    #pane-ai .delete-custom-btn svg { width: 15px; height: 15px; }
 
     /* ---- model row: a real field, label above the control ---- */
     #pane-ai .card-model {
@@ -2644,7 +2618,7 @@
     #pane-ai .add-provider:hover { border-color: #41414d; color: #d4d4dc; background: rgba(255,255,255,0.022); }
     #pane-ai .add-provider svg { width: 16px; height: 16px; }
 
-    #pane-ai .setting-section { background: none; border: 0; padding: 0; margin: 22px 0 0; }
+    #pane-ai .setting-section { background: none; border: 0; padding: 0; margin: 22px 0 10px; }
     #pane-ai .setting-header { margin-bottom: 10px; }
     #pane-ai .setting-title {
       display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -2892,7 +2866,7 @@
           </ul>
           <div class="su-row su-rise" style="--su-d: 0.88s">
             <button type="button" class="su-btn" id="su-goto-youtube">Open YouTube and try it</button>
-            <button type="button" class="su-btn sec" id="su-goto-settings">Go to settings</button>
+            <button type="button" class="su-btn su-sec" id="su-goto-settings">Go to settings</button>
           </div>
         </div>
       </section>
@@ -2922,7 +2896,7 @@
         </button>
         <button class="nav-item" data-pane="stats" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 19V11M12 19V5M19 19v-5"/></svg>
-          <span class="nav-label">Statistics</span>
+          <span class="nav-label">Your usage</span>
           <em class="nav-val" id="nav-val-stats"></em>
         </button>
         <button class="nav-item" data-pane="about" role="tab" aria-selected="false">
@@ -3105,7 +3079,7 @@
             <span>Chrome will ask permission to reach <b id="cp-host">that host</b> first.</span>
           </p>
           <span class="cp-btns">
-            <button type="button" class="su-btn sec" id="cp-cancel">Cancel</button>
+            <button type="button" class="su-btn su-sec" id="cp-cancel">Cancel</button>
             <button type="button" class="su-btn" id="save-custom-provider-btn">Save provider</button>
           </span>
         </div>
@@ -3120,10 +3094,10 @@
         </p>
       </section>
 
-      <!-- Statistics pane -->
+      <!-- Your usage pane -->
       <section class="pane" id="pane-stats" role="tabpanel">
         <div class="pane-head">
-          <div class="pane-title">Statistics</div>
+          <div class="pane-title">Your usage</div>
           <div class="pane-sub">Counted on this computer, and kept here. One seed per summary.</div>
         </div>
 

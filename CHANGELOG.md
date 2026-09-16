@@ -9,6 +9,92 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Changed
+
+- **The Detail control shows you what you are choosing.** The slider is now a
+  field of forty-two slots laid across the video's runtime, with one lit for
+  every point that level returns: Brief lights a scattering, In-depth lights all
+  of them. The reading sits top right the way a meter's does — *36 POINTS* — and
+  the video's own clock runs under the field, so the picture is legible as a
+  sampling rate rather than a volume slider. Drag across it, click a level, or
+  use the arrow keys, as before.
+- **Opening it no longer buries the panel.** The module hangs off the header's
+  bottom edge and spans the panel, and the panel behind it dims and blurs. The
+  old popover was a plate three percent lighter than the panel with a shadow the
+  dark ground swallowed, landing on top of full-contrast content that went on
+  competing with it. Elevation is focus now, not altitude.
+- The counts are the density model from `constants.js`, reached through a new
+  `GET_DETAIL_ESTIMATE` message rather than re-derived in the panel, so the
+  field can't drift from what the request will actually ask the model for. The
+  bars are drawn to scale against the densest level and the reading carries the
+  absolute figure, so no single bar claims to be a particular point. When the
+  runtime can't be read, the field falls back to the proportions the static
+  prompt implies and reads out the level instead of inventing a number.
+- The estimate counts windows. A video over 90 minutes isn't summarised in one
+  call — `planWindows` cuts it up and prices each window on its own length — so
+  pricing the whole runtime once gave a different answer from the one the run
+  would ask for (27 against 25 for a four-hour Brief, five roundings of 48
+  minutes not being one rounding of 240). `detailEstimate` now makes the same
+  split before adding the windows up.
+- The reading is marked `≈`. The directive asks for a count and then explicitly
+  invites going past it — there is no upper limit on points — and the real
+  windows are measured from the transcript rather than the player. A bare
+  number claimed a precision neither of those allows.
+- The module follows the panel's theme — a graphite housing with an inset well
+  on a dark panel, a near-white one on a light panel, each over its own veil.
+- **The overview card is just the overview.** The gist of the whole video, in a
+  paragraph, on one raised slab with room to breathe — and nothing else on it.
+  Gone: the runtime, which is on the player an inch away; the reading time,
+  which measured a document read end to end rather than a summary scanned until
+  something looks worth watching; the point count, which restated the list
+  directly underneath; and the age of the summary, which could only ever say
+  "just now" because the cache lives for one page session. The model that wrote
+  it stays, behind the detail chip, where it is a diagnosis rather than a
+  greeting.
+- The slab drops its border for a soft shadow — at a 14px radius a stroke reads
+  as a box drawn around the text instead of a surface under it — takes 18px of
+  padding, and sets the overview at 13.5px, the largest body size in the panel,
+  since it is the only prose there. Its controls sit under a hairline so they
+  read as a footer rather than a second paragraph. Both skins drop the figures;
+  the slab treatment is *Quiet* only.
+- A summary that arrives without an overview line no longer draws an empty card
+  around a lone chip: the level stands on its own line and the slab is skipped.
+- Settings' live preview follows, in both skins and both themes — it is meant to
+  be a faithful miniature of the panel, so it loses the same figures and takes
+  the same slab.
+- The **Statistics** screen is now **Your usage**. "Statistics" promises analysis;
+  the screen keeps a tally — summaries generated, watching time saved, video in
+  against reading out — and "usage" is what that honestly is. It also keeps the
+  possessive the settings nav uses to mark the screens that are about you rather
+  than about the extension.
+- **Fixed:** the Custom provider sheet's Cancel label sat high in its button. It
+  carried the class `sec`, which is also this page's section layout class, and
+  `.sec:first-of-type { padding-top: 0 }` won the specificity tie against the
+  button's own padding. The button modifier is now `su-sec`, so the two cannot
+  collide again.
+- **Fixed:** with more than one provider configured, the first provider card sat
+  flush against the "Summaries written by" selector, which had no bottom margin.
+  It now keeps the same 10px the cards keep between themselves.
+- **Fixed:** a provider with no icon of its own — which in practice means every
+  custom one — was drawn with a dollar sign. It gets the plug the Custom provider
+  sheet leads with instead, in the cards, the unconfigured list and the Auto
+  selector alike.
+- Deleting a custom provider moves out of the card header, where a lone red trash
+  icon sat beside Replace key, and into the form that Replace key opens, beside
+  the other destructive action. The key button reads "Remove key" on a custom
+  provider now, since "Remove" alone said nothing next to "Delete provider".
+  Deleting still releases the host permission that provider was granted; removing
+  its key never did, which is why the two are separate buttons rather than one.
+- **Fixed:** YouTube's chip-cloud scroll arrows painted over the open popover.
+  The panel container is `position: relative` with `z-index: auto`, so it never
+  established a stacking context and the popover's own `z-index` had nothing to
+  be raised inside of. The container now takes a z-index while the popover is
+  open and gives it back on close — below YouTube's dialog layer, so a real
+  dialog still comes first. Both skins.
+- *Quiet* skin only, apart from that fix. *Classic* keeps its lozenge slider and
+  its chip-anchored popover, now built by its own function rather than sharing
+  one with a pile of `if (quiet)` branches.
+
 ## 1.8.0 — 2026-09-16
 
 ### Added

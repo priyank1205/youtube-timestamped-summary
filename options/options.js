@@ -8,7 +8,12 @@ import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 const SAVE_ICON = '<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>';
 const SPINNER = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;animation:spin 0.6s linear infinite"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>';
 const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
-const TRASH_ICON = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+// The plug the Custom provider sheet leads with. Every provider without an icon
+// of its own falls back to it — which in practice means every custom one — so a
+// card in the list matches the dialog that created it. It used to be a dollar
+// sign, which said nothing about the provider and quite a lot about money.
+const CUSTOM_PROVIDER_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v6H7v3a5 5 0 0 0 4 4.9V22h2v-6.1A5 5 0 0 0 17 11V8h-2V2h-2v6h-2V2H9z"/></svg>';
+
 
 // Escape a dynamic string for interpolation into an HTML template. Provider
 // names, descriptions and model ids are user- or provider-supplied text, so
@@ -57,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     panes.forEach((p) => p.classList.toggle('active', p.id === `pane-${name}`));
     // The bloom is a canvas, and a canvas in a display:none pane measures zero.
-    // Statistics is never the pane that opens, so the first honest chance to
+    // Your usage is never the pane that opens, so the first honest chance to
     // size it is the moment it is shown.
     if (name === 'stats') drawBloom();
   }
@@ -190,7 +195,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         <button class="save-btn" id="save-${id}-key">
           <span class="btn-content">${SAVE_ICON} Save</span>
         </button>
-        ${!inModal ? `<button class="remove-btn" id="remove-${id}-key" hidden>Remove</button>` : ''}
+        ${!inModal ? `<button class="remove-btn" id="remove-${id}-key" hidden>${p.isCustom ? 'Remove key' : 'Remove'}</button>` : ''}
+        ${(p.isCustom && !inModal) ? `<button class="remove-btn delete-custom-btn" data-id="${id}">Delete provider</button>` : ''}
       </div>
       
       ${(!p.isCustom && !inModal) ? `
@@ -214,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderConfiguredCard(p, res) {
-    const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+    const svgIcon = p.svgIcon || CUSTOM_PROVIDER_ICON;
 
     const id = escapeHtml(p.id);
     const cardHTML = `
@@ -229,7 +235,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <span class="status-badge not-configured" id="${id}-status">Not set</span>
           <button class="card-edit" id="${id}-edit" hidden>Replace key</button>
-          ${p.isCustom ? `<button class="delete-custom-btn" data-id="${id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
         </div>
         <div class="card-model" id="${id}-modelrow" hidden>
           <span>Model</span>
@@ -246,7 +251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderUnconfiguredItem(p) {
-    const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+    const svgIcon = p.svgIcon || CUSTOM_PROVIDER_ICON;
     
     const item = document.createElement('div');
     item.className = 'command-item';
@@ -549,7 +554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const p = ALL_PROVIDERS[model];
       if (p) {
         activeModelText.textContent = p.name;
-        activeModelIcon.innerHTML = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+        activeModelIcon.innerHTML = p.svgIcon || CUSTOM_PROVIDER_ICON;
       }
     }
     
@@ -601,7 +606,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const item = document.createElement('div');
         item.className = `command-item ${activeModelId === p.id ? 'active' : ''}`;
         item.dataset.model = p.id;
-        const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+        const svgIcon = p.svgIcon || CUSTOM_PROVIDER_ICON;
         item.innerHTML = `
           <div class="command-item-icon ${escapeHtml(p.cssClass || 'openai')}">${svgIcon}</div>
           <div class="command-item-name">${escapeHtml(p.name)}</div>
@@ -706,17 +711,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return n;
   };
 
-  // Words a point carries at each level, from LENGTH_MODEL's output budget in
-  // scripts/constants.js (40 / 80 / 150 tokens) at the usual ~0.75 words per
-  // token. Only used for the "N min read" the Original panel prints.
-  const WORDS_PER_POINT = { brief: 30, standard: 60, detailed: 112 };
-  const readMinutes = (level, points) =>
-    Math.max(1, Math.round((points * WORDS_PER_POINT[level]) / 200));
-
-  const clockLong = (minutes) => {
-    const total = Math.round(minutes * 60);
-    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-  };
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const svg = (tag, attrs) => {
@@ -771,20 +765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ---- overview card ----
     const gist = el('div', 'pv-gist');
     const brief = el('div', 'pv-brief');
-    brief.append(el('p', 'pv-eyebrow', 'Overview'), el('p', 'pv-text', PREVIEW_GIST));
-
-    const rail = el('div', 'pv-rail');
-    const stats = [
-      [clockLong(PREVIEW_MINUTES), 'video'],
-      [String(shape.target), shape.target === 1 ? 'point' : 'points'],
-      [`${readMinutes(level, shape.target)} min`, 'read']
-    ];
-    for (const [value, name] of stats) {
-      const stat = el('span', 'pv-stat');
-      stat.append(el('b', null, value), ` ${name}`);
-      rail.append(stat);
-    }
-    brief.append(rail);
+    brief.append(el('p', 'pv-text', PREVIEW_GIST));
 
     const acts = el('div', 'pv-acts');
     acts.append(el('span', 'pv-link', 'Show more'), el('span', 'pv-dot', '·'),
@@ -933,7 +914,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // --- Statistics ----------------------------------------------------------
+  // --- Your usage -----------------------------------------------------------
   //
   // A handful of running totals is all this extension records, so the page
   // makes them legible rather than inventing a chart it has no data for: one

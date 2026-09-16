@@ -63,17 +63,19 @@ One button, and nothing is sent anywhere until you press it.
 
 **Brief** marks the major sections. **Standard** is the default. **In-depth** keeps the names, numbers and conclusions.
 
+The selector draws what you are picking: a field of marks across the video's runtime, one lit for every point that level returns, with the count read out above it. The panel behind dims and blurs while you choose.
+
 Counts come from the video's real runtime, so a two-hour talk earns more rows than a ten-minute clip — [see the density model](#detail-levels).
 
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/overview.png" alt="The expanded overview card: a paragraph summarising the video, then 1:43:12 video, 43 points, 7 min read, with Show less, Copy and an In-depth badge"></td>
+<td><img src="docs/screenshots/overview.png" alt="The overview card: a paragraph summarising the whole video, with Show less, Copy and an In-depth badge beneath it"></td>
 <td valign="top">
 
 ### An overview before the outline
 
-What the video is actually about, in plain sentences — with its runtime, the number of points and how long they take to read.
+What the video is actually about, in plain sentences. Nothing else: the runtime is on the player, and the list below already says what is in here and where.
 
 Enough to decide in five seconds whether to keep going.
 
@@ -492,8 +494,8 @@ Counts scale with the real runtime and are floored — not capped — so a long 
 |---|---|
 | **Click-to-seek** | Every point is a link into the video |
 | **Follows playback** | The row playing now highlights itself; one control scrolls the list back to it |
-| **Briefing card** | Overview, runtime, point count, reading time, and the level it was generated at |
-| **Provenance** | Press the detail chip on a result to see which model wrote it and how long ago |
+| **Briefing card** | The gist of the whole video in a paragraph, and the level it was generated at |
+| **Provenance** | Press the detail chip on a result to see which model wrote it |
 | **Copy** | Copy the overview, or diagnostics with keys and signed URLs stripped |
 | **Collapsible** | Collapse the panel, or expand individual points |
 | **Two skins, three themes** | *Classic* and *Quiet* panel designs; System / Light / Dark |

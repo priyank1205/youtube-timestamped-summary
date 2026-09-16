@@ -41,12 +41,30 @@
   --q-ghost: rgba(255, 255, 255, 0.07);
   --q-track: #2a2a2a;
   --q-dot: #4f4f4f;
+  --q-mod-top: #191a1d;
+  --q-mod-bot: #0d0d0f;
+  --q-mod-edge: rgba(255, 255, 255, 0.1);
+  --q-mod-lip: rgba(255, 255, 255, 0.07);
+  --q-mod-shadow: 0 20px 44px rgba(0, 0, 0, 0.6);
+  --q-mod-text: #f1f1f1;
+  --q-mod-dim: #7e838c;
+  --q-mod-body: #b9bdc4;
+  --q-well: #070708;
+  --q-well-edge: rgba(0, 0, 0, 0.6);
+  --q-well-lip: rgba(255, 255, 255, 0.05);
+  --q-bar: #3a3d42;
+  --q-bar-on: #ff5c5c;
+  --q-bar-glow: 0 0 6px rgba(255, 92, 92, 0.45);
+  --q-stop-on-bg: rgba(255, 92, 92, 0.13);
+  --q-stop-on-text: #ffb3b3;
+  --q-scrim: rgba(8, 8, 8, 0.5);
   --q-thumb-bg: #ececec;
   --q-thumb-border: transparent;
   --q-thumb-text: #141414;
   --q-spinner-track: rgba(255, 255, 255, 0.25);
   --q-spinner-head: #ffffff;
   --q-focus: rgba(255, 92, 92, 0.5);
+  --q-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --q-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   --q-pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   --q-scrollbar: rgba(255, 255, 255, 0.18);
@@ -74,6 +92,25 @@
   --q-ghost: rgba(0, 0, 0, 0.06);
   --q-track: #ececec;
   --q-dot: #c8c8c8;
+  --q-mod-top: #ffffff;
+  --q-mod-bot: #f7f7f5;
+  --q-mod-edge: rgba(0, 0, 0, 0.1);
+  --q-mod-lip: rgba(255, 255, 255, 0.9);
+  --q-mod-shadow: 0 20px 44px rgba(0, 0, 0, 0.16);
+  --q-mod-text: #0f0f0f;
+  --q-mod-dim: #7c8189;
+  --q-mod-body: #5c6067;
+  --q-well: #f1f1ef;
+  --q-well-edge: rgba(0, 0, 0, 0.1);
+  --q-well-lip: rgba(0, 0, 0, 0.04);
+  --q-bar: #d3d5d8;
+  --q-bar-on: #cc0000;
+  --q-bar-glow: 0 0 6px rgba(204, 0, 0, 0.26);
+  --q-stop-on-bg: rgba(204, 0, 0, 0.09);
+  --q-stop-on-text: #a30000;
+  /* A veil, not a wash: the module is near-white in this theme, so the panel
+     behind it has to go grey for the module to read as lifted off it. */
+  --q-scrim: rgba(184, 184, 182, 0.5);
   --q-thumb-bg: #ffffff;
   --q-thumb-border: #d0d0d0;
   --q-thumb-text: #0f0f0f;
@@ -378,27 +415,40 @@
   border-bottom: 1px solid var(--q-divider);
 }
 
+/* The gist as one object: a raised slab with real padding, holding the
+   paragraph and the row that acts on it. No border — at this radius a stroke
+   reads as a box drawn around the text rather than a surface under it, and the
+   shadow already separates the slab from the panel. */
 .yt-timestamps-container.yt-skin-quiet .yt-brief {
   background: var(--q-raised);
-  border: 1px solid var(--q-border);
-  border-radius: 10px;
-  padding: 13px 14px 11px;
+  border: 0;
+  border-radius: 14px;
+  padding: 18px 17px 15px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
 }
 
 /* Light Quiet has no raised tone of its own — the panel is already white — so
-   the card steps down instead of up. */
+   the slab steps down a shade and takes a hairline ring, which reads on white
+   where a shadow does not. */
 .yt-timestamps-container.yt-skin-quiet.yt-theme-light .yt-brief {
-  background: #fafafa;
-  border-color: var(--q-border);
+  background: #fbfbfb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-brief-rail {
-  border-top-color: var(--q-divider);
-  color: var(--q-text-3);
+/* The controls sit under a rule, so the paragraph owns the top of the slab and
+   they read as its footer rather than as a second paragraph. */
+.yt-timestamps-container.yt-skin-quiet .yt-gist-actions {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid var(--q-divider);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-brief-stat b {
-  color: var(--q-text-2);
+/* No overview, no slab: the level sits on its own line and needs no rule above
+   it, because there is nothing above it. */
+.yt-timestamps-container.yt-skin-quiet .yt-gist-bare .yt-gist-actions {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .yt-timestamps-container.yt-skin-quiet .yt-brief-detail {
@@ -427,17 +477,10 @@
   color: var(--q-text-3);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-gist-eyebrow {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.7px;
-  color: var(--q-text-3);
-  margin-bottom: 8px;
-}
-
+/* The only prose in the panel, so it gets the largest body size in it. */
 .yt-timestamps-container.yt-skin-quiet .yt-gist-text {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.58;
   color: var(--q-text-1);
 }
 
@@ -667,18 +710,7 @@
   box-shadow: var(--q-pop-shadow);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-label {
-  color: var(--q-text-2);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-value {
-  color: var(--q-text-1);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-cap {
-  color: var(--q-text-3);
-}
-
+/* The "?" toggle and the long help text below it, shared by both popover shapes. */
 .yt-timestamps-container.yt-skin-quiet .yt-detail-help-btn {
   color: var(--q-text-3);
 }
@@ -689,150 +721,282 @@
   background: var(--q-hover);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-track {
-  background: var(--q-track);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-dot {
-  background: var(--q-dot);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-dot.active {
-  background: var(--q-dot);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-thumb {
-  background: var(--q-thumb-bg);
-  border: 1px solid var(--q-thumb-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-track:hover .yt-detail-thumb {
-  background: var(--q-thumb-bg);
-  border-color: var(--q-thumb-border);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-track:focus-visible .yt-detail-thumb {
-  box-shadow: 0 0 0 2px var(--q-focus), 0 1px 3px rgba(0, 0, 0, 0.35);
-}
-
 .yt-timestamps-container.yt-skin-quiet .yt-detail-help {
   border-top-color: var(--q-divider);
   color: var(--q-text-2);
 }
 
-/* --- Detail slider v2 (Quiet-only markup, built by buildDetailChip) ----------
-   Effort-style: a labeled lozenge thumb that free-tracks the pointer and
-   spring-snaps to detents on release; level names sit under the track. */
+/* --- Detail: the density field (Quiet-only markup, built by buildDetailChip) --
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 {
-  width: 264px;
-  padding: 14px 16px 16px;
+   Direction "Comb", as art-directed. The field stands in for the video's runtime
+   and lights one bar per sample of it, so the three levels are drawn to scale
+   against each other and the reading above carries the absolute count.
+
+   The module is machined hardware: it hangs off the header's bottom edge, spans
+   the panel, and sits in its own housing with an inset well. The panel behind it
+   dims and blurs rather than the module climbing higher — elevation by focus.
+   -------------------------------------------------------------------------- */
+
+/* Dim and blur behind the module. Lives inside the panel, so the panel's own
+   rounding and overflow clip it to exactly the area it should cover. */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: var(--q-scrim);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: ytCombScrimIn 0.16s ease;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-top {
-  margin-bottom: 12px;
+@keyframes ytCombScrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track {
-  height: 34px;
-  border-radius: 10px;
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb {
+  padding: 14px 14px 15px;
+  border: 1px solid var(--q-mod-edge);
+  border-radius: 13px;
+  background: linear-gradient(180deg, var(--q-mod-top) 0%, var(--q-mod-bot) 62%);
+  box-shadow: inset 0 1px 0 var(--q-mod-lip), var(--q-mod-shadow);
+  color: var(--q-mod-text);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-dot {
-  width: 4px;
-  height: 4px;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-dot.active {
-  background: var(--q-accent-text);
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-thumb {
-  width: 74px;
-  height: 26px;
-  border-radius: 8px;
+.yt-timestamps-container.yt-skin-quiet .yt-comb-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: left 0.35s cubic-bezier(0.3, 1.5, 0.55, 1), transform 0.15s ease;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-thumb-label {
-  font-size: 11px;
+.yt-timestamps-container.yt-skin-quiet .yt-comb-lead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-label {
+  font-family: var(--q-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--q-mod-dim);
+  white-space: nowrap;
+}
+
+/* The reading sits where a meter puts its number: top right, large, in the
+   same face as the scale labels. */
+.yt-timestamps-container.yt-skin-quiet .yt-comb-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-read-approx {
+  font-family: var(--q-mono);
+  font-size: 12px;
+  color: var(--q-mod-dim);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-read-n {
+  font-family: var(--q-mono);
+  font-size: 16px;
   font-weight: 500;
-  line-height: 1;
-  color: var(--q-thumb-text);
-  user-select: none;
+  letter-spacing: -0.02em;
+  color: var(--q-mod-text);
 }
 
-/* The track auto-focuses when the popover opens; a loud ring on the thumb at
-   rest reads as noise. Keep keyboard affordance as a faint ring on the track
-   groove itself instead. */
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track:focus-visible .yt-detail-thumb {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+.yt-timestamps-container.yt-skin-quiet .yt-comb-read-u {
+  font-family: var(--q-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--q-mod-dim);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track:focus-visible {
-  box-shadow: 0 0 0 1px var(--q-border);
+/* An inset well, so the bars read as material sitting in the housing rather
+   than marks drawn on top of it. */
+.yt-timestamps-container.yt-skin-quiet .yt-comb-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  /* The bars are a percentage of this box, so it has to be the box the padding
+     is inside of — otherwise a full-height bar overshoots the well. */
+  box-sizing: border-box;
+  height: 58px;
+  margin-top: 12px;
+  padding: 8px 7px;
+  border: 1px solid var(--q-well-edge);
+  border-radius: 7px;
+  background: var(--q-well);
+  box-shadow: inset 0 1px 0 var(--q-well-lip);
+  cursor: ew-resize;
+  touch-action: none;
 }
 
-/* While dragging: the thumb follows the pointer raw (no left transition) and
-   scales up slightly — a grabbed, physical feel. Released, the transition
-   above spring-snaps it onto the detent. */
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track.dragging .yt-detail-thumb {
-  transition: transform 0.15s ease;
-  transform: translate(-50%, -50%) scale(1.06);
+.yt-timestamps-container.yt-skin-quiet .yt-comb-field:focus-visible {
+  outline: none;
+  box-shadow: inset 0 1px 0 var(--q-well-lip), 0 0 0 2px var(--q-focus);
 }
 
-/* Level names under the track at their detent positions */
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-levels {
+.yt-timestamps-container.yt-skin-quiet .yt-comb-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--q-bar);
+  opacity: 0.55;
+  transition: height 0.22s ease, background-color 0.22s ease, opacity 0.22s ease;
+  transition-delay: var(--yt-comb-d, 0ms);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-bar.on {
+  height: var(--yt-comb-h);
+  background: var(--q-bar-on);
+  box-shadow: var(--q-bar-glow);
+  opacity: 1;
+}
+
+/* Dragging is direct manipulation: the field has to answer the pointer, not
+   ripple along behind it a tenth of a second later. */
+.yt-timestamps-container.yt-skin-quiet .yt-comb-field.dragging .yt-comb-bar {
+  transition-duration: 0.1s;
+  transition-delay: 0ms;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-axis {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 6px;
+  font-family: var(--q-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--q-mod-dim);
+  font-variant-numeric: tabular-nums;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level {
-  background: none;
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stops {
+  display: flex;
+  margin-top: 11px;
+  border: 1px solid var(--q-mod-edge);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stop {
+  flex: 1;
+  padding: 7px 4px;
+  background: transparent;
   border: none;
-  padding: 2px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--q-text-3);
+  border-right: 1px solid var(--q-mod-edge);
+  font-family: var(--q-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--q-mod-dim);
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level:hover {
-  color: var(--q-text-2);
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stop:last-child {
+  border-right: none;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level.active {
-  color: var(--q-text-1);
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stop:hover {
+  color: var(--q-mod-text);
 }
 
-/* Always-visible one-liner for the current level, crossfading on change */
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-desc {
-  margin-top: 10px;
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stop.active {
+  background: var(--q-stop-on-bg);
+  color: var(--q-stop-on-text);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-comb-desc {
+  margin-top: 11px;
   font-size: 12px;
+  line-height: 1.45;
+  color: var(--q-mod-body);
+}
+
+/* The module carries its own greys, so the shared help rules don't apply here. */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb .yt-detail-help-btn {
+  color: var(--q-mod-dim);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb .yt-detail-help-btn:hover,
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb .yt-detail-help-btn.active {
+  color: var(--q-mod-text);
+  background: transparent;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb .yt-detail-help-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-comb .yt-detail-help {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--q-mod-edge);
+  font-size: 11.5px;
   line-height: 1.5;
-  color: var(--q-text-2);
+  color: var(--q-mod-dim);
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-desc.yt-desc-in {
-  animation: ytQuietDescIn 0.18s ease;
+/* A forty-two bar ripple, and a panel dissolving behind it, are exactly the
+   ambient motion this setting asks us to drop. Both still change; they just
+   change at once. */
+@media (prefers-reduced-motion: reduce) {
+  .yt-timestamps-container.yt-skin-quiet .yt-comb-bar {
+    transition: none;
+    transition-delay: 0ms;
+  }
+
+  .yt-timestamps-container.yt-skin-quiet .yt-detail-scrim {
+    animation: none;
+  }
 }
 
-@keyframes ytQuietDescIn {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+/* The chip carries five bars of the level's own density — a fragment of the
+   field, so the closed control and the open one read as the same object. */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip {
+  gap: 7px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 6px;
 }
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 10px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i {
+  display: block;
+  width: 1.5px;
+  height: 3px;
+  border-radius: 0.5px;
+  background: var(--q-accent-text);
+  opacity: 0.35;
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on {
+  opacity: 1;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on:nth-child(1) { height: 6px; }
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on:nth-child(2) { height: 10px; }
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on:nth-child(3) { height: 5px; }
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on:nth-child(4) { height: 9px; }
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.on:nth-child(5) { height: 7px; }
 
 /* --- Title tooltip -------------------------------------------------------------- */
 

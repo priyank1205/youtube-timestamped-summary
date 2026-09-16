@@ -720,68 +720,98 @@ function storedDetailIndex() {
 // generates (see runAnalysis), so abandoned fiddling doesn't change the default.
 let _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
 
-// Build the interactive header "Detail" control (used before generation): a chip
-// showing the current level (Brief / Standard / In-depth) that opens a popover
-// slider on click. Selecting a level updates the in-memory `_pendingDetail`; it's
-// committed to SUMMARY_LENGTH (the sticky default) only when the user generates.
-// Returns the chip wrapper; the popover is mounted onto the panel container on
-// open (so the panel's overflow:hidden can't clip it).
-function buildDetailChip() {
-    let index = storedDetailIndex();
-    _pendingDetail = DETAIL_OPTIONS[index].value;
-    let open = false;
-    let helpOpen = false;
-    let dragging = false;
+// --- The density field (quiet skin) ---------------------------------------
+//
+// Slot count in the field. Fixed on purpose: the field's job is to show the three
+// levels to scale against each other, and the readout above it carries the
+// absolute count. A field that drew one bar per point would be unreadable on a
+// three-hour podcast, and would promise an exactness the estimate doesn't have.
+const DETAIL_FIELD_SLOTS = 42;
+
+// Bar heights, as a fraction of the field's height. A flat comb reads as a
+// progress bar; uneven heights read as sampled material. Deterministic, so the
+// field doesn't reshuffle itself every time it renders.
+const DETAIL_BAR_HEIGHTS = Array.from(
+    { length: DETAIL_FIELD_SLOTS },
+    (_, i) => 0.5 + Math.abs(Math.sin(i * 12.9898 + 3.7)) * 0.5
+);
+
+// Relative densities for the case where the background can't be reached, as a
+// fraction of the densest level. Shaped like the rate model in constants.js
+// without copying its point counts here, where they would quietly drift.
+const DETAIL_FALLBACK_SHAPE = [0.22, 0.5, 1];
+
+// What each level would produce for this video, cached per duration. Requested
+// when the chip is built — long before the popover can be opened — so the field
+// never draws one set of numbers and then corrects itself.
+let _detailEstimate = null;
+let _detailEstimateKey = null;
+
+// The video's runtime in minutes, or null until the player reports it.
+function videoDurationMinutes() {
+    const video = document.querySelector('video');
+    return (video && Number.isFinite(video.duration) && video.duration > 0)
+        ? video.duration / 60
+        : null;
+}
+
+// Ask the background what each level would ask the model for on this video. The
+// callback runs with null when the estimate can't be had at all, which the field
+// draws as relative densities with no counts beside them.
+function readDetailEstimate(callback) {
+    const minutes = videoDurationMinutes();
+    const key = minutes === null ? 'unknown' : String(Math.round(minutes));
+    if (_detailEstimate && _detailEstimateKey === key) {
+        callback(_detailEstimate);
+        return;
+    }
+    try {
+        chrome.runtime.sendMessage({ action: 'GET_DETAIL_ESTIMATE', durationMinutes: minutes }, (res) => {
+            if (!chrome.runtime.lastError && res && res.targets) {
+                _detailEstimate = res;
+                _detailEstimateKey = key;
+            }
+            if (callback) callback(_detailEstimate);
+        });
+    } catch {
+        if (callback) callback(_detailEstimate);
+    }
+}
+
+// How many slots light up at `index`: the level's share of the densest level's
+// count, so the three are drawn to scale. On a video too short to tell the levels
+// apart the counts converge and so does the picture — which is the truth.
+function detailLitSlots(index) {
+    const targets = _detailEstimate?.targets;
+    const counts = targets ? DETAIL_OPTIONS.map((o) => targets[o.value] || 0) : null;
+    const densest = counts ? Math.max(...counts) : 0;
+    if (!densest) return Math.max(1, Math.round(DETAIL_FALLBACK_SHAPE[index] * DETAIL_FIELD_SLOTS));
+    return Math.max(1, Math.round((counts[index] / densest) * DETAIL_FIELD_SLOTS));
+}
+
+// Which slots are lit, spread evenly across the field, so the picture reads as a
+// sampling rate over the runtime rather than a bar filling from the left.
+function detailLitSet(count) {
+    const lit = new Set();
+    const last = DETAIL_FIELD_SLOTS - 1;
+    if (count <= 1) { lit.add(0); return lit; }
+    for (let k = 0; k < count; k++) lit.add(Math.round((k * last) / (count - 1)));
+    return lit;
+}
+
+// The classic skin's control: end captions, a grooved track with a dot per level,
+// and a lozenge thumb that snaps detent to detent.
+function buildClassicDetailBody(select, helpBtn) {
     const lastIndex = DETAIL_OPTIONS.length - 1;
-
-    // Skin variant, decided at build time. Quiet builds the v2 popover: labeled
-    // lozenge thumb, level labels under the track, always-visible one-line
-    // description, free-tracking drag with a spring snap on release.
-    const quiet = _skinPref === 'quiet';
-
-    // Thumb width (must match CSS). Positions are inset by half the thumb so the
-    // thumb sits fully inside the track at the extremes instead of clipping.
-    // The v2 thumb is wider because it carries the current level's name.
-    const THUMB_W = quiet ? 74 : 46;
+    const THUMB_W = 46;
     const posLeft = (frac) => `calc(${THUMB_W / 2}px + (100% - ${THUMB_W}px) * ${frac})`;
     const fracOf = (i) => (lastIndex ? i / lastIndex : 0);
 
-    // --- Chip (lives in the header) ---
-    const wrap = document.createElement('div');
-    wrap.className = 'yt-detail-chip-wrap';
+    const node = document.createDocumentFragment();
 
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'yt-detail-chip';
-    chip.title = 'Summary detail';
-    chip.setAttribute('aria-haspopup', 'dialog');
-    chip.setAttribute('aria-expanded', 'false');
-
-    const chipLabel = document.createElement('span');
-    chipLabel.className = 'yt-detail-chip-label';
-
-    const chipCaret = document.createElement('span');
-    chipCaret.className = 'yt-detail-chip-caret';
-    chipCaret.innerHTML = '<svg width="9" height="9" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>';
-
-    chip.appendChild(chipLabel);
-    chip.appendChild(chipCaret);
-    wrap.appendChild(chip);
-
-    // --- Popover (Effort-style slider), mounted on open ---
-    const pop = document.createElement('div');
-    pop.className = quiet ? 'yt-detail-pop yt-detail-pop-v2' : 'yt-detail-pop';
-    pop.setAttribute('role', 'dialog');
-    pop.setAttribute('aria-label', 'Summary detail');
-    pop.hidden = true;
-    // Clicks inside the popover must not bubble to the header (which toggles the
-    // summary accordion) or to the document close-listener.
-    pop.addEventListener('click', (e) => e.stopPropagation());
-
-    // Title row: "Detail <value>" on the left, a "?" help toggle on the right.
+    // Title row: "Detail <value>" on the left, the "?" help toggle on the right.
     const top = document.createElement('div');
     top.className = 'yt-detail-top';
-
     const titleGroup = document.createElement('div');
     titleGroup.className = 'yt-detail-title';
     const label = document.createElement('span');
@@ -790,16 +820,7 @@ function buildDetailChip() {
     const value = document.createElement('span');
     value.className = 'yt-detail-value';
     titleGroup.appendChild(label);
-    // v2 shows the current level inside the thumb instead of the title row.
-    if (!quiet) titleGroup.appendChild(value);
-
-    const helpBtn = document.createElement('button');
-    helpBtn.type = 'button';
-    helpBtn.className = 'yt-detail-help-btn';
-    helpBtn.title = 'What does this level mean?';
-    helpBtn.setAttribute('aria-label', 'Explain this detail level');
-    helpBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-
+    titleGroup.appendChild(value);
     top.appendChild(titleGroup);
     top.appendChild(helpBtn);
 
@@ -815,7 +836,6 @@ function buildDetailChip() {
     caps.appendChild(capLeft);
     caps.appendChild(capRight);
 
-    // Grooved track with evenly spaced dots and a lozenge thumb.
     const track = document.createElement('div');
     track.className = 'yt-detail-track';
     track.setAttribute('role', 'slider');
@@ -834,146 +854,347 @@ function buildDetailChip() {
 
     const thumb = document.createElement('div');
     thumb.className = 'yt-detail-thumb';
-    // v2: the thumb carries the current level's name.
-    let thumbLabel = null;
-    if (quiet) {
-        thumbLabel = document.createElement('span');
-        thumbLabel.className = 'yt-detail-thumb-label';
-        thumb.appendChild(thumbLabel);
-    }
     track.appendChild(thumb);
 
-    // v2: level names under the track at their detent positions (click to
-    // select), plus an always-visible one-line description that crossfades.
-    let levelEls = [];
-    let desc = null;
-    if (quiet) {
-        const levels = document.createElement('div');
-        levels.className = 'yt-detail-levels';
-        levelEls = DETAIL_OPTIONS.map((opt, i) => {
-            const lvl = document.createElement('button');
-            lvl.type = 'button';
-            lvl.className = 'yt-detail-level';
-            lvl.textContent = opt.label;
-            lvl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                select(i);
-            });
-            levels.appendChild(lvl);
-            return lvl;
-        });
+    node.appendChild(top);
+    node.appendChild(caps);
+    node.appendChild(track);
 
-        desc = document.createElement('div');
-        desc.className = 'yt-detail-desc';
-
-        var quietLevels = levels;
+    // Map a pointer x-position to the nearest level index.
+    function indexFromClientX(clientX, current) {
+        const rect = track.getBoundingClientRect();
+        const usable = rect.width - THUMB_W;
+        if (usable <= 0) return current;
+        let frac = (clientX - rect.left - THUMB_W / 2) / usable;
+        frac = Math.min(1, Math.max(0, frac));
+        return Math.round(frac * lastIndex);
     }
+
+    let dragging = false;
+    track.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        select(indexFromClientX(e.clientX, 0));
+    });
+    track.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        select(indexFromClientX(e.clientX, 0));
+    });
+    const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+    attachDetailKeys(track, select);
+
+    return {
+        node,
+        focusTarget: track,
+        render(index) {
+            const opt = DETAIL_OPTIONS[index];
+            thumb.style.left = posLeft(fracOf(index));
+            value.textContent = opt.label;
+            track.setAttribute('aria-valuenow', String(index));
+            track.setAttribute('aria-valuetext', opt.label);
+            dots.forEach((d, i) => d.classList.toggle('active', i === index));
+        }
+    };
+}
+
+// The quiet skin's control: a field of slots standing in for the video's runtime,
+// with the points this level would return lit across it. The picture answers "how
+// much is In-depth?" before the sentence under it has been read; the readout
+// carries the real count, because the field is drawn to scale, not to the point.
+function buildCombDetailBody(select, helpBtn) {
+    const lastIndex = DETAIL_OPTIONS.length - 1;
+    const node = document.createElement('div');
+    node.className = 'yt-comb';
+
+    // Head: what the control measures on the left, the reading on the right —
+    // the layout an instrument uses, not the one a form uses.
+    const head = document.createElement('div');
+    head.className = 'yt-comb-head';
+
+    const lead = document.createElement('div');
+    lead.className = 'yt-comb-lead';
+    const label = document.createElement('span');
+    label.className = 'yt-comb-label';
+    label.textContent = 'Detail — sampling';
+    lead.appendChild(label);
+    lead.appendChild(helpBtn);
+
+    const readout = document.createElement('span');
+    readout.className = 'yt-comb-readout';
+    // The prompt asks for this many and then explicitly invites going past it,
+    // and the windows it will be split into are measured from the transcript
+    // rather than the player. The count is a good estimate, not a promise, and
+    // the reading says so rather than implying a precision it hasn't got.
+    const readApprox = document.createElement('span');
+    readApprox.className = 'yt-comb-read-approx';
+    readApprox.textContent = '\u2248';
+    const readValue = document.createElement('span');
+    readValue.className = 'yt-comb-read-n';
+    const readUnit = document.createElement('span');
+    readUnit.className = 'yt-comb-read-u';
+    readUnit.textContent = 'points';
+    readout.appendChild(readApprox);
+    readout.appendChild(readValue);
+    readout.appendChild(readUnit);
+
+    head.appendChild(lead);
+    head.appendChild(readout);
+
+    const field = document.createElement('div');
+    field.className = 'yt-comb-field';
+    field.setAttribute('role', 'slider');
+    field.setAttribute('tabindex', '0');
+    field.setAttribute('aria-label', 'Summary detail');
+    field.setAttribute('aria-valuemin', '0');
+    field.setAttribute('aria-valuemax', String(lastIndex));
+
+    const mid = (DETAIL_FIELD_SLOTS - 1) / 2;
+    const bars = [];
+    for (let i = 0; i < DETAIL_FIELD_SLOTS; i++) {
+        const bar = document.createElement('span');
+        bar.className = 'yt-comb-bar';
+        bar.style.setProperty('--yt-comb-h', `${Math.round(DETAIL_BAR_HEIGHTS[i] * 100)}%`);
+        // Light spreads outward from the middle instead of everything at once.
+        // Carried as a custom property so the dragging and reduced-motion rules
+        // can cancel it without fighting an inline style.
+        bar.style.setProperty('--yt-comb-d', `${Math.round(Math.abs(i - mid) * 4)}ms`);
+        field.appendChild(bar);
+        bars.push(bar);
+    }
+
+    // The field is the runtime, so the axis names it. Hidden before the player
+    // reports a duration — an axis with nothing on it is furniture.
+    const axis = document.createElement('div');
+    axis.className = 'yt-comb-axis';
+    const axisStart = document.createElement('span');
+    const axisMid = document.createElement('span');
+    const axisEnd = document.createElement('span');
+    axis.appendChild(axisStart);
+    axis.appendChild(axisMid);
+    axis.appendChild(axisEnd);
+
+    function renderAxis() {
+        const minutes = videoDurationMinutes();
+        if (minutes === null) { axis.hidden = true; return; }
+        axis.hidden = false;
+        axisStart.textContent = clockLabel(0);
+        axisMid.textContent = clockLabel((minutes * 60) / 2);
+        axisEnd.textContent = clockLabel(minutes * 60);
+    }
+
+    // The field is the picture and the coarse control; this row is the precise
+    // one, and the shortest path to a level for anyone not dragging.
+    const stops = document.createElement('div');
+    stops.className = 'yt-comb-stops';
+    const stopEls = DETAIL_OPTIONS.map((opt, i) => {
+        const stop = document.createElement('button');
+        stop.type = 'button';
+        stop.className = 'yt-comb-stop';
+        stop.textContent = opt.label;
+        stop.addEventListener('click', (e) => {
+            e.stopPropagation();
+            select(i);
+        });
+        stops.appendChild(stop);
+        return stop;
+    });
+
+    const desc = document.createElement('div');
+    desc.className = 'yt-comb-desc';
+
+    node.appendChild(head);
+    node.appendChild(field);
+    node.appendChild(axis);
+    node.appendChild(stops);
+    node.appendChild(desc);
+
+    // Map a pointer x-position across the field to the nearest level.
+    function indexFromClientX(clientX, current) {
+        const rect = field.getBoundingClientRect();
+        if (rect.width <= 0) return current;
+        let frac = (clientX - rect.left) / rect.width;
+        frac = Math.min(1, Math.max(0, frac));
+        return Math.round(frac * lastIndex);
+    }
+
+    let dragging = false;
+    let currentIndex = 0;
+    field.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        field.classList.add('dragging');
+        try { field.setPointerCapture(e.pointerId); } catch (_) {}
+        select(indexFromClientX(e.clientX, currentIndex));
+    });
+    field.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        select(indexFromClientX(e.clientX, currentIndex));
+    });
+    const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        field.classList.remove('dragging');
+        try { field.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    field.addEventListener('pointerup', endDrag);
+    field.addEventListener('pointercancel', endDrag);
+    attachDetailKeys(field, select);
+
+    renderAxis();
+
+    return {
+        node,
+        focusTarget: field,
+        // The module hangs off the header's bottom edge and spans the panel, so
+        // it reads as part of the panel rather than a card hovering beside the
+        // chip. The panel behind it dims and blurs; see openPop.
+        fullWidth: true,
+        render(index) {
+            currentIndex = index;
+            const opt = DETAIL_OPTIONS[index];
+            const count = _detailEstimate?.targets?.[opt.value];
+            const lit = detailLitSet(detailLitSlots(index));
+            bars.forEach((bar, i) => bar.classList.toggle('on', lit.has(i)));
+            // No count means the background couldn't be reached. The field still
+            // shows the levels to scale, so read out the level instead of a
+            // number the panel is in no position to promise.
+            readValue.textContent = count ? String(count) : opt.label;
+            readUnit.hidden = !count;
+            readApprox.hidden = !count;
+            stopEls.forEach((el, i) => el.classList.toggle('active', i === index));
+            desc.textContent = opt.short;
+            renderAxis();
+            field.setAttribute('aria-valuenow', String(index));
+            field.setAttribute('aria-valuetext', count
+                ? `${opt.label}, about ${count} points`
+                : opt.label);
+        }
+    };
+}
+
+// Arrow / Home / End on whichever element is acting as the slider.
+function attachDetailKeys(node, select) {
+    const lastIndex = DETAIL_OPTIONS.length - 1;
+    node.addEventListener('keydown', (e) => {
+        const now = Number(node.getAttribute('aria-valuenow')) || 0;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); select(now - 1); }
+        else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); select(now + 1); }
+        else if (e.key === 'Home') { e.preventDefault(); select(0); }
+        else if (e.key === 'End') { e.preventDefault(); select(lastIndex); }
+    });
+}
+
+// Build the interactive header "Detail" control (used before generation): a chip
+// showing the current level (Brief / Standard / In-depth) that opens a popover on
+// click. Selecting a level updates the in-memory `_pendingDetail`; it's committed
+// to SUMMARY_LENGTH (the sticky default) only when the user generates. Returns the
+// chip wrapper; the popover is mounted onto the panel container on open (so the
+// panel's overflow:hidden can't clip it).
+function buildDetailChip() {
+    let index = storedDetailIndex();
+    _pendingDetail = DETAIL_OPTIONS[index].value;
+    let open = false;
+    let helpOpen = false;
+    const lastIndex = DETAIL_OPTIONS.length - 1;
+
+    // Skin variant, decided at build time. Quiet builds the density field; classic
+    // keeps the original lozenge slider.
+    const quiet = _skinPref === 'quiet';
+
+    // --- Chip (lives in the header) ---
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-detail-chip-wrap';
+
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'yt-detail-chip';
+    chip.title = 'Summary detail';
+    chip.setAttribute('aria-haspopup', 'dialog');
+    chip.setAttribute('aria-expanded', 'false');
+
+    // A five-bar mark of the level's own density, so the chip is a small piece of
+    // the field rather than a word with an arrow beside it.
+    let glyphBars = [];
+    if (quiet) {
+        const glyph = document.createElement('span');
+        glyph.className = 'yt-detail-glyph';
+        glyph.setAttribute('aria-hidden', 'true');
+        for (let i = 0; i < 5; i++) {
+            const bar = document.createElement('i');
+            glyph.appendChild(bar);
+            glyphBars.push(bar);
+        }
+        chip.appendChild(glyph);
+    }
+
+    const chipLabel = document.createElement('span');
+    chipLabel.className = 'yt-detail-chip-label';
+
+    const chipCaret = document.createElement('span');
+    chipCaret.className = 'yt-detail-chip-caret';
+    chipCaret.innerHTML = '<svg width="9" height="9" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>';
+
+    chip.appendChild(chipLabel);
+    chip.appendChild(chipCaret);
+    wrap.appendChild(chip);
+
+    // --- Popover, mounted on open ---
+    const pop = document.createElement('div');
+    pop.className = quiet ? 'yt-detail-pop yt-detail-pop-comb' : 'yt-detail-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Summary detail');
+    pop.hidden = true;
+    // Clicks inside the popover must not bubble to the header (which toggles the
+    // summary accordion) or to the document close-listener.
+    pop.addEventListener('click', (e) => e.stopPropagation());
+
+    const helpBtn = document.createElement('button');
+    helpBtn.type = 'button';
+    helpBtn.className = 'yt-detail-help-btn';
+    helpBtn.title = 'What does this level mean?';
+    helpBtn.setAttribute('aria-label', 'Explain this detail level');
+    helpBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
     // Longer per-level explanation, toggled by the "?" icon.
     const help = document.createElement('div');
     help.className = 'yt-detail-help';
     help.hidden = true;
 
-    pop.appendChild(top);
-    if (!quiet) pop.appendChild(caps);
-    pop.appendChild(track);
-    if (quiet) {
-        pop.appendChild(quietLevels);
-        pop.appendChild(desc);
-    }
+    const body = quiet
+        ? buildCombDetailBody(select, helpBtn)
+        : buildClassicDetailBody(select, helpBtn);
+
+    pop.appendChild(body.node);
     pop.appendChild(help);
 
     function render() {
         const opt = DETAIL_OPTIONS[index];
-        // While a v2 drag is live the thumb tracks the pointer freely; the
-        // detent position is applied on release (spring snap).
-        if (!(quiet && dragging)) {
-            thumb.style.left = posLeft(fracOf(index));
-        }
         chipLabel.textContent = opt.label;
-        value.textContent = opt.label;
         help.textContent = opt.help;
-        track.setAttribute('aria-valuenow', String(index));
-        track.setAttribute('aria-valuetext', opt.label);
-        dots.forEach((d, i) => d.classList.toggle('active', i === index));
         if (quiet) {
-            thumbLabel.textContent = opt.label;
-            levelEls.forEach((el, i) => el.classList.toggle('active', i === index));
-            // Crossfade the one-liner only when it actually changes (remove +
-            // reflow restarts the entrance animation).
-            if (desc.textContent !== opt.short) {
-                desc.textContent = opt.short;
-                desc.classList.remove('yt-desc-in');
-                void desc.offsetWidth;
-                desc.classList.add('yt-desc-in');
-            }
+            const filled = Math.max(1, Math.round((detailLitSlots(index) / DETAIL_FIELD_SLOTS) * glyphBars.length));
+            glyphBars.forEach((bar, i) => bar.classList.toggle('on', i < filled));
         }
+        body.render(index);
     }
 
     function select(i) {
         const next = Math.min(lastIndex, Math.max(0, i));
+        if (next === index) return;
         index = next;
         render();
         // In-memory only — committed to SUMMARY_LENGTH when the user generates.
         _pendingDetail = DETAIL_OPTIONS[index].value;
     }
-
-    // Map a pointer x-position to the nearest level index.
-    function indexFromClientX(clientX) {
-        const rect = track.getBoundingClientRect();
-        const usable = rect.width - THUMB_W;
-        if (usable <= 0) return index;
-        let frac = (clientX - rect.left - THUMB_W / 2) / usable;
-        frac = Math.min(1, Math.max(0, frac));
-        return Math.round(frac * lastIndex);
-    }
-
-    // v2 drag feel: the thumb follows the pointer freely (clamped inside the
-    // track) while the nearest level stays selected live; classic snaps the
-    // thumb detent-to-detent as before.
-    function thumbToPointer(clientX) {
-        const rect = track.getBoundingClientRect();
-        const half = THUMB_W / 2;
-        const x = Math.min(rect.width - half, Math.max(half, clientX - rect.left));
-        thumb.style.left = `${x}px`;
-    }
-
-    track.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragging = true;
-        try { track.setPointerCapture(e.pointerId); } catch (_) {}
-        if (quiet) {
-            track.classList.add('dragging');
-            thumbToPointer(e.clientX);
-        }
-        select(indexFromClientX(e.clientX));
-    });
-    track.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        if (quiet) thumbToPointer(e.clientX);
-        select(indexFromClientX(e.clientX));
-    });
-    const endDrag = (e) => {
-        if (!dragging) return;
-        dragging = false;
-        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
-        if (quiet) {
-            // Release: spring-snap to the selected detent (the `dragging` class
-            // held the left-transition off while tracking the pointer).
-            track.classList.remove('dragging');
-            thumb.style.left = posLeft(fracOf(index));
-        }
-    };
-    track.addEventListener('pointerup', endDrag);
-    track.addEventListener('pointercancel', endDrag);
-
-    track.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); select(index - 1); }
-        else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); select(index + 1); }
-        else if (e.key === 'Home') { e.preventDefault(); select(0); }
-        else if (e.key === 'End') { e.preventDefault(); select(lastIndex); }
-    });
 
     helpBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -991,27 +1212,65 @@ function buildDetailChip() {
         if (e.key === 'Escape') { e.preventDefault(); closePop(); chip.focus(); }
     };
 
+    // The dim-and-blur behind the module. It lives inside the panel so the panel's
+    // own rounding and overflow clip it, and it is what answers the complaint the
+    // old popover never did: the panel is still there, still legible in
+    // silhouette, and unmistakably not the thing being read.
+    let scrim = null;
+
+    function addScrim(panel, headerBottom) {
+        if (!panel || scrim) return;
+        scrim = document.createElement('div');
+        scrim.className = 'yt-detail-scrim';
+        scrim.style.top = `${headerBottom - panel.getBoundingClientRect().top}px`;
+        panel.appendChild(scrim);
+    }
+
+    function removeScrim() {
+        if (scrim && scrim.parentElement) scrim.parentElement.removeChild(scrim);
+        scrim = null;
+    }
+
     function openPop() {
         const container = wrap.closest('.yt-timestamps-container');
         if (!container) return;
         container.appendChild(pop);
         pop.hidden = false;
 
-        // Anchor the popover just below the chip, clamped inside the container so
-        // it never spills past the right edge.
         const chipRect = chip.getBoundingClientRect();
         const contRect = container.getBoundingClientRect();
-        const popW = pop.offsetWidth || 236;
-        let left = chipRect.left - contRect.left;
-        const maxLeft = contRect.width - popW - 8;
-        if (left > maxLeft) left = Math.max(8, maxLeft);
-        pop.style.left = `${left}px`;
-        pop.style.top = `${chipRect.bottom - contRect.top + 8}px`;
+        const panel = container.querySelector('.yt-timestamps-panel');
+        const header = panel && panel.querySelector('.yt-timestamps-panel-header');
+        const headerBottom = header ? header.getBoundingClientRect().bottom : chipRect.bottom;
+
+        if (body.fullWidth && panel) {
+            // Hung off the header's bottom edge and inset from the panel's sides,
+            // so the module belongs to the panel instead of floating beside the
+            // chip that opened it.
+            const panelRect = panel.getBoundingClientRect();
+            pop.style.left = `${panelRect.left - contRect.left + 12}px`;
+            pop.style.width = `${Math.max(240, panelRect.width - 24)}px`;
+            pop.style.top = `${headerBottom - contRect.top + 12}px`;
+            addScrim(panel, headerBottom);
+        } else {
+            // Anchor the popover just below the chip, clamped inside the container
+            // so it never spills past the right edge.
+            const popW = pop.offsetWidth || 236;
+            let left = chipRect.left - contRect.left;
+            const maxLeft = contRect.width - popW - 8;
+            if (left > maxLeft) left = Math.max(8, maxLeft);
+            pop.style.left = `${left}px`;
+            pop.style.top = `${chipRect.bottom - contRect.top + 8}px`;
+        }
 
         open = true;
+        container.classList.add('yt-detail-open');
         chip.setAttribute('aria-expanded', 'true');
         chip.classList.add('open');
-        track.focus();
+        // Cheap when the counts are already cached; re-asks only when the player
+        // has since reported a duration the build-time request didn't have.
+        if (quiet) readDetailEstimate(() => render());
+        body.focusTarget.focus();
         // Defer so the opening click doesn't immediately close it.
         setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
         document.addEventListener('keydown', onKeydown, true);
@@ -1020,6 +1279,9 @@ function buildDetailChip() {
     function closePop() {
         open = false;
         pop.hidden = true;
+        removeScrim();
+        const container = pop.parentElement || wrap.closest('.yt-timestamps-container');
+        if (container) container.classList.remove('yt-detail-open');
         if (pop.parentElement) pop.parentElement.removeChild(pop);
         chip.setAttribute('aria-expanded', 'false');
         chip.classList.remove('open');
@@ -1035,6 +1297,11 @@ function buildDetailChip() {
 
     render();
 
+    // The field's point counts come from the background, where the density model
+    // lives. Asked for at build time so the answer is in hand well before the chip
+    // can be clicked open, and the field never renumbers itself under the cursor.
+    if (quiet) readDetailEstimate(() => render());
+
     // Confirm against the background. Normally this agrees with what was just
     // drawn; it only moves the chip in the degraded case where the mount's
     // bounded wait for the preferences timed out. In-memory selection only.
@@ -1047,8 +1314,8 @@ function buildDetailChip() {
 }
 
 // The summary's detail control, shown on the briefing card rather than in the
-// panel header. Pressing it discloses the model and the age of the result —
-// the two things a viewer asks about a summary they did not just watch appear.
+// panel header. Pressing it discloses which model wrote the summary — the one
+// thing a viewer asks about a result that reads oddly.
 //
 // `meta` is the request that generated the summary on screen. It matters that
 // this reads from there and not from storage: the stored preference is a global
@@ -1058,9 +1325,10 @@ function buildBriefingDetail(meta) {
     const generated = DETAIL_OPTIONS.find((o) => o.value === meta?.length);
     const label = (generated || DETAIL_OPTIONS[storedDetailIndex()]).label;
 
-    const provenance = [];
-    if (meta?.modelId) provenance.push(meta.modelId);
-    if (meta?.generatedAt) provenance.push(`generated ${relativeTime(meta.generatedAt)}`);
+    // The model only. The summary's age used to sit beside it, and it could never
+    // say anything but "just now": the cache is per page session, so a rendered
+    // summary is always one this tab produced minutes ago at the outside.
+    const provenance = meta?.modelId ? [meta.modelId] : [];
 
     // Nothing to disclose (an older cached render, or the dev harness): a plain
     // read-only badge, and the stored preference as the best guess at a label.
@@ -1108,36 +1376,10 @@ function buildBriefingDetail(meta) {
     return { control: btn, line };
 }
 
-// "4 min ago" / "2 hours ago" / "3 days ago" — how old the summary on screen is.
-function relativeTime(timestamp) {
-    const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
-    if (seconds < 90) return 'just now';
-    const units = [
-        { limit: 3600, size: 60, name: 'min', plural: false },
-        { limit: 86400, size: 3600, name: 'hour', plural: true },
-        { limit: 2592000, size: 86400, name: 'day', plural: true }
-    ];
-    for (const unit of units) {
-        if (seconds < unit.limit) {
-            const value = Math.round(seconds / unit.size);
-            const suffix = unit.plural && value !== 1 ? 's' : '';
-            return `${value} ${unit.name}${suffix} ago`;
-        }
-    }
-    return new Date(timestamp).toLocaleDateString();
-}
-
-// The video's own length, for the briefing rail. The player is the accurate
-// source and is right there; the request's duration (taken from the last
-// transcript cue) covers a restore that renders before the player is ready.
-function videoRuntimeLabel(meta) {
-    const video = document.querySelector('video');
-    let seconds = (video && Number.isFinite(video.duration) && video.duration > 0) ? video.duration : null;
-    if (!seconds && typeof meta?.durationMinutes === 'number' && meta.durationMinutes > 0) {
-        seconds = meta.durationMinutes * 60;
-    }
-    if (!seconds) return null;
-    const whole = Math.round(seconds);
+// A position on the video clock, in the same shape the summary's own timestamps
+// use. The Detail field's time axis is the only caller.
+function clockLabel(seconds) {
+    const whole = Math.max(0, Math.round(seconds));
     const hours = Math.floor(whole / 3600);
     const minutes = Math.floor(whole / 60) % 60;
     const secs = String(whole % 60).padStart(2, '0');
@@ -1146,12 +1388,6 @@ function videoRuntimeLabel(meta) {
         : `${minutes}:${secs}`;
 }
 
-// Minutes to read the summary, at the same 200 wpm the background uses to
-// estimate time saved — so the two numbers can never disagree.
-function readingMinutes(summaryText) {
-    const words = String(summaryText || '').trim().split(/\s+/).filter(Boolean).length;
-    return words ? Math.max(1, Math.round(words / 200)) : null;
-}
 
 // Gear (settings) icon markup, shared by the empty-state header.
 const GEAR_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
@@ -1855,117 +2091,99 @@ function splitOverview(summaryText) {
     return { overview: overview.join(' ').trim() || null, lines: body };
 }
 
-// The briefing card: what this summary is, before the chapter list starts.
+// The briefing card: the gist of the whole video, in a paragraph, above the
+// chapter list.
 //
-// The audit asked for "the gist in the first glance" without settling what a
-// glance is, so this is where those decisions live:
-//  - The card is the one raised surface in the panel — a fill and a hairline,
-//    no shadow, which inside a 402px column would read as a modal. It says
-//    "this block is about the summary", not "this is the first row".
+// It carries no figures, and that is the design rather than an omission:
+//  - The runtime is on the player an inch away, so printing it here spends a
+//    line to tell someone something they are already looking at.
+//  - The reading time measured a document read end to end. That is not what
+//    happens to a summary — it gets scanned until something looks worth
+//    watching, and then abandoned for the video.
+//  - A point count, a contents or a coverage figure would only restate the
+//    chapter list sitting directly underneath it.
+// What is left is the one thing nothing else on the panel says: what this video
+// is about. So the paragraph gets the whole slab.
+//
+// The rest of the decisions that live here:
+//  - The card is the one raised surface in the panel — a fill and a soft
+//    shadow, no border, which at this radius would read as a box drawn around
+//    the text rather than a surface under it.
 //  - Collapsed is three lines of overview. The card's own padding costs height,
 //    and the third line buys most of it back.
-//  - The rail carries only figures the extension already has: the video's
-//    length, the points that survived validation, and the reading time at the
-//    same 200 wpm the background uses. Together they are the whole proposition
-//    — 72 minutes of video, 3 minutes of reading.
-//  - The detail level lives here rather than in the header, next to the numbers
-//    it explains, and discloses the model and the summary's age when pressed.
 //  - "Show more" appears only when something is actually clipped; a control
 //    that expands nothing is worse than no control (see revealGistToggle).
 //  - Copy takes the overview alone. Copying the whole summary with timestamp
 //    links is its own backlog item; this button does the small thing it says.
 //  - Expansion is not persisted. It costs one click, and a remembered
 //    expansion would make the panel a different height on every video.
-function buildBriefingCard({ overview, meta, points, summaryText }) {
+function buildBriefingCard({ overview, meta }) {
     const block = document.createElement('div');
     block.className = 'yt-gist';
     // Joins the Quiet skin's entrance cascade at position 0, ahead of the rows.
     block.style.setProperty('--yt-i', 0);
 
+    const actions = document.createElement('div');
+    actions.className = 'yt-gist-actions';
+    const detail = buildBriefingDetail(meta);
+
+    // Nothing to introduce. A slab drawn around a lone chip is an empty box, so
+    // the level stands on its own line and the card is skipped entirely.
+    if (!overview) {
+        actions.classList.add('yt-gist-actions-solo');
+        actions.appendChild(detail.control);
+        block.classList.add('yt-gist-bare');
+        block.appendChild(actions);
+        if (detail.line) block.appendChild(detail.line);
+        return block;
+    }
+
     const card = document.createElement('div');
     card.className = 'yt-brief';
 
-    if (overview) {
-        const eyebrow = document.createElement('span');
-        eyebrow.className = 'yt-gist-eyebrow';
-        eyebrow.textContent = 'Overview';
+    // Model-generated prose: a text node, never innerHTML.
+    const body = document.createElement('p');
+    body.className = 'yt-gist-text';
+    body.id = 'yt-gist-text';
+    body.textContent = overview;
+    card.appendChild(body);
 
-        // Model-generated prose: a text node, never innerHTML.
-        const body = document.createElement('p');
-        body.className = 'yt-gist-text';
-        body.id = 'yt-gist-text';
-        body.textContent = overview;
+    const moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'yt-gist-link yt-gist-more';
+    moreBtn.textContent = 'Show more';
+    moreBtn.setAttribute('aria-expanded', 'false');
+    moreBtn.setAttribute('aria-controls', 'yt-gist-text');
+    // Revealed after layout, once we know the text is long enough to clip.
+    moreBtn.hidden = true;
+    moreBtn.addEventListener('click', () => {
+        const expanded = card.classList.toggle('yt-gist-expanded');
+        moreBtn.textContent = expanded ? 'Show less' : 'Show more';
+        moreBtn.setAttribute('aria-expanded', String(expanded));
+    });
 
-        card.appendChild(eyebrow);
-        card.appendChild(body);
-    }
+    const separator = document.createElement('span');
+    separator.className = 'yt-gist-sep';
+    separator.textContent = '\u00B7';
+    separator.hidden = true;
+    separator.setAttribute('aria-hidden', 'true');
 
-    const rail = document.createElement('div');
-    rail.className = 'yt-brief-rail';
-    const runtime = videoRuntimeLabel(meta);
-    const minutes = readingMinutes(summaryText);
-    const stats = [
-        runtime ? [runtime, 'video'] : null,
-        points ? [String(points), points === 1 ? 'point' : 'points'] : null,
-        minutes ? [`${minutes} min`, 'read'] : null
-    ].filter(Boolean);
-    for (const [value, name] of stats) {
-        const stat = document.createElement('span');
-        stat.className = 'yt-brief-stat';
-        const strong = document.createElement('b');
-        strong.textContent = value;
-        stat.appendChild(strong);
-        stat.appendChild(document.createTextNode(` ${name}`));
-        rail.appendChild(stat);
-    }
-    if (stats.length) card.appendChild(rail);
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'yt-gist-link yt-gist-copy';
+    copyBtn.textContent = 'Copy';
+    copyBtn.title = 'Copy the overview';
+    copyBtn.addEventListener('click', () => {
+        writeClipboardText(overview)
+            .then(() => reportCopy(copyBtn, 'Copy', true))
+            .catch(() => reportCopy(copyBtn, 'Copy', false));
+    });
 
-    const actions = document.createElement('div');
-    actions.className = 'yt-gist-actions';
-
-    if (overview) {
-        const moreBtn = document.createElement('button');
-        moreBtn.type = 'button';
-        moreBtn.className = 'yt-gist-link yt-gist-more';
-        moreBtn.textContent = 'Show more';
-        moreBtn.setAttribute('aria-expanded', 'false');
-        moreBtn.setAttribute('aria-controls', 'yt-gist-text');
-        // Revealed after layout, once we know the text is long enough to clip.
-        moreBtn.hidden = true;
-        moreBtn.addEventListener('click', () => {
-            const expanded = card.classList.toggle('yt-gist-expanded');
-            moreBtn.textContent = expanded ? 'Show less' : 'Show more';
-            moreBtn.setAttribute('aria-expanded', String(expanded));
-        });
-
-        const separator = document.createElement('span');
-        separator.className = 'yt-gist-sep';
-        separator.textContent = '·';
-        separator.hidden = true;
-        separator.setAttribute('aria-hidden', 'true');
-
-        const copyBtn = document.createElement('button');
-        copyBtn.type = 'button';
-        copyBtn.className = 'yt-gist-link yt-gist-copy';
-        copyBtn.textContent = 'Copy';
-        copyBtn.title = 'Copy the overview';
-        copyBtn.addEventListener('click', () => {
-            writeClipboardText(overview)
-                .then(() => reportCopy(copyBtn, 'Copy', true))
-                .catch(() => reportCopy(copyBtn, 'Copy', false));
-        });
-
-        actions.appendChild(moreBtn);
-        actions.appendChild(separator);
-        actions.appendChild(copyBtn);
-    } else {
-        // No overview to read: the detail control is the row's only occupant and
-        // sits where the links would have started, not pushed to the far edge.
-        actions.classList.add('yt-gist-actions-solo');
-    }
-
-    const detail = buildBriefingDetail(meta);
+    actions.appendChild(moreBtn);
+    actions.appendChild(separator);
+    actions.appendChild(copyBtn);
     actions.appendChild(detail.control);
+
     card.appendChild(actions);
     if (detail.line) card.appendChild(detail.line);
 
@@ -2237,12 +2455,7 @@ function renderTimestampsUI(summaryText, meta) {
         console.warn(`[yt-timestamps] No timestamp items parsed from a ${summaryText.length}-character summary.`);
     }
 
-    const briefing = buildBriefingCard({
-        overview,
-        meta: request,
-        points: itemCount,
-        summaryText
-    });
+    const briefing = buildBriefingCard({ overview, meta: request });
     timestampsList.insertBefore(briefing, timestampsList.firstChild);
 
     panelContent.appendChild(timestampsList);
