@@ -338,24 +338,61 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
   return { text: parts.join('\n'), finishReason: null };
 }
 
-// Delight stat: record one successful summary and the estimated watch-time it
-// saved. "Saved" = the video's length minus the time to read the summary at
-// READING_WPM, clamped at zero (a summary can't cost more than the video). When
-// the duration couldn't be parsed we still count the summary but add 0 seconds.
-// Fire-and-forget so it never delays the response to the panel.
+// Delight stats: record one successful summary and the few figures the
+// Statistics screen draws from. "Saved" = the video's length minus the time to
+// read the summary at READING_WPM, clamped at zero (a summary can't cost more
+// than the video).
+//
+// Every one of these is a running total or a maximum — a handful of integers
+// and one date. Nothing here keeps a row per video, a title, a URL or a time of
+// day, so the screen can still say it is counted on this computer and kept
+// here. Fire-and-forget, so it never delays the response to the panel.
 const READING_WPM = 200;
-function recordSummaryStat(summary, durationMinutes) {
+const STAT_KEYS = [
+  'SUMMARIES_COUNT', 'SECONDS_SAVED', 'POINTS_TOTAL',
+  'VIDEO_SECONDS_TOTAL', 'READ_SECONDS_TOTAL', 'LONGEST_VIDEO_SECONDS',
+  'FIRST_SUMMARY_AT', 'COUNT_AT_FIRST'
+];
+function recordSummaryStat(summary, durationMinutes, points) {
   const words = (summary || '').trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = words / READING_WPM;
-  const savedMinutes = durationMinutes ? Math.max(0, durationMinutes - readMinutes) : 0;
-  const savedSeconds = Math.round(savedMinutes * 60);
-  chrome.storage.local.get(['SUMMARIES_COUNT', 'SECONDS_SAVED'], (res) => {
-    chrome.storage.local.set({
+  const videoSeconds = durationMinutes ? Math.round(durationMinutes * 60) : 0;
+  const savedSeconds = durationMinutes
+    ? Math.round(Math.max(0, durationMinutes - readMinutes) * 60) : 0;
+  const pointCount = Number.isFinite(points) ? Math.max(0, Math.round(points)) : 0;
+
+  chrome.storage.local.get(STAT_KEYS, (res) => {
+    const update = {
       SUMMARIES_COUNT: (res.SUMMARIES_COUNT || 0) + 1,
       SECONDS_SAVED: (res.SECONDS_SAVED || 0) + savedSeconds,
-    });
+      POINTS_TOTAL: (res.POINTS_TOTAL || 0) + pointCount
+    };
+    // Only a duration we actually parsed goes into these. A zero would count as
+    // a video of no length and drag the in-versus-out ratio toward a saving
+    // that never happened.
+    //
+    // Reading time is kept rather than derived from SECONDS_SAVED. The two
+    // would only cancel on a profile where every counter started together, and
+    // the profiles that matter are the ones that did not: SECONDS_SAVED
+    // carries every summary made before these keys existed, so subtracting it
+    // from a runtime total that starts at zero today goes negative and stays
+    // there. These three rise together from the same first summary, whenever
+    // that happens to be.
+    if (videoSeconds > 0) {
+      update.VIDEO_SECONDS_TOTAL = (res.VIDEO_SECONDS_TOTAL || 0) + videoSeconds;
+      update.READ_SECONDS_TOTAL = (res.READ_SECONDS_TOTAL || 0) + Math.round(readMinutes * 60);
+      update.LONGEST_VIDEO_SECONDS = Math.max(res.LONGEST_VIDEO_SECONDS || 0, videoSeconds);
+    }
+    // The first one only ever writes once, and it is the only date kept. The
+    // count standing at that moment is written with it: on a profile that was
+    // already running, "since" begins today while SUMMARIES_COUNT is already
+    // in the hundreds, and a rate taken from the two would read sixty a day.
+    if (!res.FIRST_SUMMARY_AT) {
+      update.FIRST_SUMMARY_AT = Date.now();
+      update.COUNT_AT_FIRST = res.SUMMARIES_COUNT || 0;
+    }
+    chrome.storage.local.set(update);
   });
-
 }
 
 function getClient(modelName, allProviders) {
@@ -789,7 +826,7 @@ async function handleAnalysis(binding, sendResponse, length) {
     if (stale()) return cancelled();
 
     // Count this successful generation + accumulate estimated time saved.
-    recordSummaryStat(summary.text, summaryOptions.durationMinutes);
+    recordSummaryStat(summary.text, summaryOptions.durationMinutes, summary.points.length);
 
     // 5. Send the validated summary to the content script to render, tagged
     //    with the request that produced it and the settings it was made under.

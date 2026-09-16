@@ -2344,31 +2344,70 @@
     .bz-cap span { display: block; }
     .bz-cap span + span { margin-top: 6px; }
 
-    /* ---- statistics: one dot per summary ---- */
-    .stat-hero { display: flex; align-items: center; gap: 28px; }
-    .stat-figure { flex: 0 0 auto; display: flex; align-items: baseline; gap: 12px; }
+    /* ---- statistics: one seed per summary ----------------------------------
+       Phyllotaxis, on a canvas: seed i sits at angle i x 137.5 degrees and
+       radius c*sqrt(i), which is how a sunflower packs without gaps. One mark
+       per summary at every count -- no cap, no "+N", and 10,000 costs the same
+       one DOM node as 10. */
+    .stat-hero { display: flex; align-items: center; gap: 32px; flex-wrap: wrap; }
+    .stat-bloom { flex: 0 0 auto; width: 212px; height: 212px; position: relative; }
+    .stat-bloom canvas { width: 100%; height: 100%; display: block; }
+    .stat-empty {
+      position: absolute; inset: 0; margin: 0; display: grid; place-items: center;
+      text-align: center; font-size: 12px; line-height: 1.5; color: var(--bz-faint);
+    }
+    /* This file has no blanket [hidden] rule, so a class that sets `display`
+       has to hand it back or the element never hides. */
+    .stat-empty[hidden] { display: none; }
+    .stat-figure { flex: 1 1 210px; min-width: 190px; }
     .stat-num {
-      font-size: 64px; font-weight: 300; letter-spacing: -0.05em; line-height: 0.9;
-      color: #fff; font-variant-numeric: tabular-nums;
+      display: block; font-size: 58px; font-weight: 300; letter-spacing: -0.05em;
+      line-height: 0.92; color: #fff; font-variant-numeric: tabular-nums;
     }
-    .stat-cap { font-size: 12px; line-height: 1.35; color: var(--bz-faint); }
-    /* Capped so the dots wrap into a block you can actually count, rather
-       than stretching into a dashed line across a wide window. */
-    .stat-dots {
-      flex: 0 1 auto; max-width: 430px; display: flex; flex-wrap: wrap; gap: 6px;
-      align-content: center; min-height: 62px; padding-left: 28px;
-      border-left: 1px solid var(--bz-ln-f);
+    .stat-cap { display: block; font-size: 12px; line-height: 1.35; color: var(--bz-faint); margin-top: 7px; }
+    .stat-reclaim { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--bz-ln-f); }
+    .stat-key { display: flex; gap: 8px 16px; flex-wrap: wrap; margin-top: 15px; font-size: 11px; color: var(--bz-faint); }
+    .stat-key i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+    .stat-key i.old { background: var(--bz-hot); }
+    .stat-key i.new { background: #f0bd5a; }
+
+    /* in versus out -- the one figure that says what the extension is for */
+    .stat-squeeze {
+      background: var(--bz-well); border-radius: 10px; box-shadow: var(--bz-cut);
+      padding: 17px 18px; display: flex; align-items: center; gap: 12px 22px; flex-wrap: wrap;
     }
-    .stat-dot {
-      width: 7px; height: 7px; border-radius: 50%; background: var(--bz-hot); display: block;
-      box-shadow: 0 0 6px rgba(224,112,95,0.45);
-      animation: dotIn .4s cubic-bezier(0.16,1,0.3,1) both;
+    .stat-flow { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+    .stat-flow b { font-size: 25px; font-weight: 500; letter-spacing: -0.03em; color: var(--bz-ink); }
+    .stat-flow b.out { color: var(--bz-hot); }
+    .stat-flow i, .stat-flow s { font-style: normal; text-decoration: none; font-size: 14px; color: var(--bz-faint); }
+    .stat-ratio { margin-left: auto; text-align: right; }
+    .stat-ratio b { display: block; font-size: 20px; font-weight: 500; letter-spacing: -0.02em; color: var(--bz-ink); }
+    .stat-ratio span { display: block; font-size: 11px; color: var(--bz-faint); margin-top: 3px; }
+    .stat-bar { flex: 1 0 100%; height: 5px; border-radius: 3px; background: #26262e; overflow: hidden; }
+    .stat-bar i { display: block; height: 100%; width: 0; background: var(--bz-hot); transition: width .5s cubic-bezier(0.16,1,0.3,1); }
+
+    /* the next round number, so the flower has somewhere to be going */
+    .stat-mile { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .stat-mile b { font-size: 13px; font-weight: 600; color: var(--bz-ink); }
+    .stat-mile span { font-size: 11.5px; color: var(--bz-faint); font-variant-numeric: tabular-nums; }
+    .stat-track { margin-top: 10px; height: 6px; border-radius: 4px; background: #16161c; box-shadow: var(--bz-cut); overflow: hidden; }
+    .stat-track i {
+      display: block; height: 100%; width: 0; border-radius: 4px;
+      background: linear-gradient(90deg, #a8503f, var(--bz-hot));
+      transition: width .5s cubic-bezier(0.16,1,0.3,1);
     }
-    .stat-dot.ghost { background: #232329; box-shadow: none; }
-    .stat-more { font-size: 11px; color: var(--bz-faint); align-self: center; margin-left: 4px; }
-    @keyframes dotIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
-    @media (prefers-reduced-motion: reduce) { .stat-dot { animation: none; } }
-    .stat-empty { margin: 16px 0 0; font-size: 12px; color: var(--bz-faint); }
+    .stat-since {
+      margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--bz-ln-f);
+      display: flex; gap: 6px 22px; flex-wrap: wrap; font-size: 11.5px; color: var(--bz-faint);
+    }
+    .stat-since[hidden] { display: none; }
+    .stat-since b { color: var(--bz-mid); font-weight: 500; }
+    /* A counter added after this profile started shows an em dash, not a
+       confident zero, until it has something of its own to say. */
+    .stat-val.waiting { color: #45454e; }
+    @media (prefers-reduced-motion: reduce) {
+      .stat-bar i, .stat-track i { transition: none; }
+    }
     .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--bz-ln-s); border-radius: 10px; overflow: hidden; box-shadow: var(--bz-cut); }
     .stat-cell { background: var(--bz-well); padding: 16px 16px 15px; }
     .stat-val {
@@ -2420,7 +2459,6 @@
       .pane-aside { box-shadow: inset 0 1px 0 #1a1a20; }
       .stat-grid { grid-template-columns: 1fr; }
       .stat-hero { flex-direction: column; align-items: flex-start; gap: 18px; }
-      .stat-dots { padding-left: 0; border-left: 0; width: 100%; }
     }
     @media (max-width: 680px) { .bz-opts.c3 { grid-template-columns: 1fr; } }
   </style>
@@ -3086,35 +3124,72 @@
       <section class="pane" id="pane-stats" role="tabpanel">
         <div class="pane-head">
           <div class="pane-title">Statistics</div>
-          <div class="pane-sub">Counted on this computer, and kept here. One dot per summary.</div>
+          <div class="pane-sub">Counted on this computer, and kept here. One seed per summary.</div>
         </div>
 
         <div class="sec">
           <div class="stat-hero">
+            <div class="stat-bloom">
+              <canvas id="stat-canvas"></canvas>
+              <p class="stat-empty" id="stat-empty" hidden>No summaries yet.<br>The first one plants the middle.</p>
+            </div>
             <div class="stat-figure">
               <span class="stat-num" id="stat-summaries">0</span>
-              <span class="stat-cap">summaries<br>generated</span>
+              <span class="stat-cap">summaries generated</span>
+              <div class="stat-reclaim">
+                <span class="stat-val" id="stat-time-saved">0m</span>
+                <span class="stat-lab" id="stat-saved-lab">of watching saved</span>
+              </div>
+              <div class="stat-key" aria-hidden="true">
+                <span><i class="old"></i>older, toward the middle</span>
+                <span><i class="new"></i>the most recent few</span>
+              </div>
             </div>
-            <div class="stat-dots" id="stat-dots" aria-hidden="true"></div>
           </div>
-          <p class="stat-empty" id="stat-empty" hidden>No summaries yet. The first one fills the first dot.</p>
+        </div>
+
+        <div class="sec">
+          <p class="bz-k">What you put in, and what you read</p>
+          <div class="stat-squeeze">
+            <div class="stat-flow">
+              <b id="stat-video">&mdash;</b><i>of video</i>
+              <s aria-hidden="true">&rarr;</s>
+              <b class="out" id="stat-read">&mdash;</b><i>of reading</i>
+            </div>
+            <div class="stat-ratio">
+              <b id="stat-shorter">&mdash;</b>
+              <span id="stat-shorter-lab">than watching it all</span>
+            </div>
+            <div class="stat-bar" aria-hidden="true">
+              <i id="stat-bar-read"></i>
+            </div>
+          </div>
         </div>
 
         <div class="sec">
           <div class="stat-grid">
             <div class="stat-cell">
-              <span class="stat-val" id="stat-time-saved">0m</span>
-              <span class="stat-lab">of watching saved</span>
-            </div>
-            <div class="stat-cell">
-              <span class="stat-val" id="stat-avg">&mdash;</span>
-              <span class="stat-lab">saved per summary, on average</span>
-            </div>
-            <div class="stat-cell">
               <span class="stat-val" id="stat-longest">&mdash;</span>
+              <span class="stat-lab">longest video you have summarised</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-points">&mdash;</span>
+              <span class="stat-lab">timestamps written for you</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-val" id="stat-films">&mdash;</span>
               <span class="stat-lab">two-hour films, roughly</span>
             </div>
           </div>
+        </div>
+
+        <div class="sec">
+          <div class="stat-mile">
+            <b id="stat-mile-label">The first seed</b>
+            <span id="stat-mile-pct"></span>
+          </div>
+          <div class="stat-track" aria-hidden="true"><i id="stat-mile-bar"></i></div>
+          <p class="stat-since" id="stat-since" hidden></p>
           <p class="bz-hint">Time saved is an estimate: each video&rsquo;s length minus how long its summary takes to read, at about 200 words a minute. It never counts below zero, and it is arithmetic on your own counter rather than a measurement of you.</p>
         </div>
       </section>

@@ -9,6 +9,65 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Added
+
+- **Statistics is a bloom.** One seed per summary, placed on a sunflower
+  spiral — seed *n* at angle *n*×137.5° and radius *c*√*n*, which is how a
+  sunflower packs without gaps. It replaces the dot grid, which stopped at 120
+  dots and then wrote `+N` for everything after. There is no cap now and no
+  arithmetic to trust: ten thousand summaries is ten thousand seeds, on one
+  canvas element, and the most recent dozen are lit.
+- **What you put in, and what you read** — the total runtime you handed the
+  extension against the time it takes to read what came back, and the ratio
+  between them. This is the figure that says what the extension is for. Both
+  sides are counted from the same first summary, so the pair always describes
+  the same videos — including on a profile that had a long history before
+  either counter existed.
+- Three more figures from counters the extension already had in hand and threw
+  away at the end of every summary: the **longest video** you have summarised,
+  the **timestamps written** for you, and the **next round number** with how
+  far into it you are. Plus **counting since**, from the date of the first
+  summary — the only date kept, written once.
+
+### Changed
+
+- The headline total now rolls past hours into days and weeks. A heavy year
+  used to read `12636h 6m`.
+
+### Fixed
+
+- **A key whose default model has been retired now lands on a current one.**
+  The retired-model list knew about old Gemini and old Claude; it now also
+  covers Claude 4.0 and 4.1, the GPT-3.5 and dated GPT-4 snapshots, the GPT-5.0
+  snapshots and rolling chat aliases, and the dated reasoning models — with a
+  model that has an announced shutdown counted as retired, because waiting for
+  the date means migrating the release *after* summaries start failing.
+- When a provider's default is not in a key's own listing, the model chosen to
+  replace it is now the first one worth using — the provider's declared
+  preference, then a cheap-tier match — rather than whichever id the listing
+  happened to return first, which could be expensive or already retired.
+  Saving a key that hits this case no longer writes back the very model that
+  just failed and asks you to go and fix it yourself.
+- Anthropic's model listing is fetched with `limit=1000`. It is ordered newest
+  first and pages at 20, so the default was on course to fall off page one and
+  a working key would have been told its own default was unavailable.
+- Validating a key treats only a 401 as "this credential is bad". A restricted
+  key that simply cannot list models answers 403 and generates perfectly well,
+  and Gemini answers a bad key with 400 — a status a malformed request shares —
+  so both now fall through to the probe that asks the question that matters.
+
+### Removed
+
+- *Ring width* never made it off the drawing board and into the product, and
+  is not in the bloom either: it is √n, a fact about how the spiral packs
+  rather than about the person reading it.
+
+A counter added today knows nothing about the summaries you made before it, so
+the new figures show a dash and say what they are waiting for rather than a
+confident zero. They fill in over the next few summaries, once each — and
+nothing on the screen mixes a new counter with an old one, which is the only
+way a figure here could come out confidently wrong.
+
 ## 1.7.0 — 2026-09-16
 
 ### Changed

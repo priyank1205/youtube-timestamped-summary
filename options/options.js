@@ -56,6 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       n.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     panes.forEach((p) => p.classList.toggle('active', p.id === `pane-${name}`));
+    // The bloom is a canvas, and a canvas in a display:none pane measures zero.
+    // Statistics is never the pane that opens, so the first honest chance to
+    // size it is the moment it is shown.
+    if (name === 'stats') drawBloom();
   }
   navItems.forEach((n) => n.addEventListener('click', () => showPane(n.dataset.pane)));
 
@@ -931,65 +935,183 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Statistics ----------------------------------------------------------
   //
-  // Two numbers are all this extension records, so the page makes them legible
-  // rather than inventing a chart it has no data for: one dot per summary, and
-  // arithmetic on the counter that is labelled as arithmetic.
-  const DOT_CAP = 120;          // beyond this the grid stops being countable
-  const FILM_SECONDS = 2 * 3600; // a "feature film" for the comparison below
+  // A handful of running totals is all this extension records, so the page
+  // makes them legible rather than inventing a chart it has no data for: one
+  // seed per summary, and arithmetic on the counters that is labelled as
+  // arithmetic. Counters added after a profile started have nothing to say
+  // about the summaries that came before them, so they hold their place and
+  // show an em dash until they do — never a confident zero.
+  const FILM_SECONDS = 2 * 3600;   // a "feature film" for the comparison below
+  const MILESTONES = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+  const SEED_OLD = '#e0705f';
+  const SEED_NEW = '#f0bd5a';
 
   const statSummaries = document.getElementById('stat-summaries');
-  const statTimeSaved = document.getElementById('stat-time-saved');
-  const statDots = document.getElementById('stat-dots');
-  const statAvg = document.getElementById('stat-avg');
-  const statFilms = document.getElementById('stat-longest');
-  const statEmpty = document.getElementById('stat-empty');
   const navValStats = document.getElementById('nav-val-stats');
+  const statCanvas = document.getElementById('stat-canvas');
+  let statCount = 0;
+
+  // formatDuration tops out at hours, which is right for a single video and
+  // wrong for a running total: a heavy year reads "12636h 6m". The headline
+  // figure rolls on into days and weeks; everything else stays in hours,
+  // where the comparison it belongs to is legible.
+  function formatSpan(seconds) {
+    const s = Math.max(0, Math.round(Number(seconds) || 0));
+    if (s < 86400) return formatDuration(s);
+    const days = Math.floor(s / 86400);
+    const hours = Math.round((s - days * 86400) / 3600);
+    if (days < 14) return hours ? `${days}d ${hours}h` : `${days}d`;
+    const weeks = Math.floor(days / 7);
+    const rest = days % 7;
+    return rest ? `${weeks}w ${rest}d` : `${weeks}w`;
+  }
+
+  // Whole hours on both sides: a ratio reads as a ratio, and the odd minutes
+  // are noise next to a figure in the hundreds.
+  const wholeHours = (seconds) => (seconds < 3600
+    ? formatDuration(seconds)
+    : `${Math.round(seconds / 3600).toLocaleString()}h`);
+
+  const setStat = (id, text, waiting) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('waiting', !!waiting);
+  };
+
+  // One seed per summary, at any count. Canvas rather than nodes: ten thousand
+  // seeds cost the same single element as ten.
+  function drawBloom() {
+    if (!statCanvas) return;
+    const w = statCanvas.clientWidth, h = statCanvas.clientHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    statCanvas.width = Math.round(w * dpr);
+    statCanvas.height = Math.round(h * dpr);
+    const g = statCanvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    if (!statCount) return;
+
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.45;
+    const c = R / Math.sqrt(statCount);
+    const r = Math.max(0.7, Math.min(5.2, c * 0.44));
+    const recent = Math.max(1, Math.min(12, Math.round(statCount * 0.015)));
+    for (let i = 0; i < statCount; i += 1) {
+      const rad = c * Math.sqrt(i + 0.5);
+      const theta = i * GOLDEN_ANGLE;
+      const fresh = i >= statCount - recent;
+      g.beginPath();
+      g.arc(cx + rad * Math.cos(theta), cy + rad * Math.sin(theta), r, 0, Math.PI * 2);
+      // One hue, light to dark by age — magnitude, not identity.
+      g.globalAlpha = fresh ? 1 : 0.34 + 0.62 * (statCount > 1 ? i / (statCount - 1) : 1);
+      g.fillStyle = fresh ? SEED_NEW : SEED_OLD;
+      g.fill();
+    }
+    g.globalAlpha = 1;
+  }
 
   if (statSummaries) {
-    chrome.storage.local.get(['SUMMARIES_COUNT', 'SECONDS_SAVED'], (res) => {
-      const count = Math.max(0, Number(res.SUMMARIES_COUNT) || 0);
-      const saved = Math.max(0, Number(res.SECONDS_SAVED) || 0);
+    chrome.storage.local.get([
+      'SUMMARIES_COUNT', 'SECONDS_SAVED', 'POINTS_TOTAL',
+      'VIDEO_SECONDS_TOTAL', 'READ_SECONDS_TOTAL', 'LONGEST_VIDEO_SECONDS',
+      'FIRST_SUMMARY_AT', 'COUNT_AT_FIRST'
+    ], (res) => {
+      const num = (v) => Math.max(0, Number(v) || 0);
+      const count = num(res.SUMMARIES_COUNT);
+      const saved = num(res.SECONDS_SAVED);
+      const points = num(res.POINTS_TOTAL);
+      const video = num(res.VIDEO_SECONDS_TOTAL);
+      const read = num(res.READ_SECONDS_TOTAL);
+      const longest = num(res.LONGEST_VIDEO_SECONDS);
+      const firstAt = num(res.FIRST_SUMMARY_AT);
 
-      statSummaries.textContent = String(count);
-      if (statTimeSaved) statTimeSaved.textContent = formatDuration(saved);
-      if (navValStats) navValStats.textContent = count ? String(count) : '';
-
-      if (statAvg) {
-        statAvg.textContent = count ? formatDuration(saved / count) : '—';
-      }
-      if (statFilms) {
-        const films = saved / FILM_SECONDS;
-        statFilms.textContent = !count ? '—'
-          : films < 1 ? films.toFixed(1)
-          : String(Math.round(films));
-      }
+      statCount = count;
+      statSummaries.textContent = count.toLocaleString();
+      if (navValStats) navValStats.textContent = count ? count.toLocaleString() : '';
+      const statEmpty = document.getElementById('stat-empty');
       if (statEmpty) statEmpty.hidden = count > 0;
+      drawBloom();
 
-      if (statDots) {
-        statDots.replaceChildren();
-        // A dot for every summary, up to where a grid is still countable.
-        // Under ten, a few empty dots show what the row is going to become.
-        const shown = Math.min(count, DOT_CAP);
-        for (let i = 0; i < shown; i += 1) {
-          const dot = document.createElement('span');
-          dot.className = 'stat-dot';
-          dot.style.animationDelay = `${Math.min(i * 12, 900)}ms`;
-          statDots.appendChild(dot);
-        }
-        for (let i = shown; i < Math.max(10, shown); i += 1) {
-          const dot = document.createElement('span');
-          dot.className = 'stat-dot ghost';
-          statDots.appendChild(dot);
-        }
-        if (count > DOT_CAP) {
-          const more = document.createElement('span');
-          more.className = 'stat-more';
-          more.textContent = `+${count - DOT_CAP}`;
-          statDots.appendChild(more);
+      setStat('stat-time-saved', formatSpan(saved), false);
+      const savedLab = document.getElementById('stat-saved-lab');
+      if (savedLab) {
+        savedLab.textContent = count
+          ? `of watching saved, at about ${formatDuration(saved / count)} each`
+          : 'of watching saved';
+      }
+
+      // In versus out. Both sides are counted from the same first summary, so
+      // the pair is always describing the same videos — including on a profile
+      // that had a long history before either counter existed.
+      const haveRatio = video > 0 && read > 0 && video > read;
+      setStat('stat-video', video ? wholeHours(video) : '—', !video);
+      setStat('stat-read', haveRatio ? wholeHours(read) : '—', !haveRatio);
+      setStat('stat-shorter', haveRatio ? `${(video / read).toFixed(1).replace(/\.0$/, '')}× shorter` : '—', !haveRatio);
+      const shorterLab = document.getElementById('stat-shorter-lab');
+      if (shorterLab) {
+        shorterLab.textContent = haveRatio ? 'than watching it all'
+          : count ? 'counting from this update' : 'once you have a summary';
+      }
+      const bar = document.getElementById('stat-bar-read');
+      if (bar) bar.style.width = haveRatio ? `${(read / video * 100).toFixed(1)}%` : '0%';
+
+      setStat('stat-longest', longest ? formatDuration(longest) : '—', !longest);
+      setStat('stat-points', points ? points.toLocaleString() : '—', !points);
+      const films = saved / FILM_SECONDS;
+      setStat('stat-films', !count ? '—' : films < 1 ? films.toFixed(1) : Math.round(films).toLocaleString(), !count);
+
+      // The next round number, so the flower has somewhere to be going.
+      const next = MILESTONES.find((m) => m > count) || null;
+      const prev = MILESTONES.filter((m) => next && m < next).pop() || 0;
+      const mileLabel = document.getElementById('stat-mile-label');
+      const milePct = document.getElementById('stat-mile-pct');
+      const mileBar = document.getElementById('stat-mile-bar');
+      const pct = next ? Math.max(0, (count - prev) / (next - prev) * 100) : 100;
+      if (mileLabel) {
+        mileLabel.textContent = !count ? 'The first seed'
+          : next ? `${(next - count).toLocaleString()} more to ${next.toLocaleString()}`
+          : 'Past every marker on the list';
+      }
+      if (milePct) milePct.textContent = count && next ? `${Math.round(pct)}%` : '';
+      if (mileBar) mileBar.style.width = `${Math.min(100, pct).toFixed(1)}%`;
+
+      // One date, written once, and the rate that falls out of it. The rate is
+      // taken from the summaries made since that date, not from every summary
+      // ever — on a profile that predates the date those are not the same
+      // number, and only one of them belongs over this many days.
+      const since = document.getElementById('stat-since');
+      if (since) {
+        const days = firstAt ? Math.max(1, Math.round((Date.now() - firstAt) / 86400000)) : 0;
+        const sinceCount = Math.max(0, count - num(res.COUNT_AT_FIRST));
+        since.hidden = !(sinceCount && firstAt);
+        if (sinceCount && firstAt) {
+          since.replaceChildren();
+          const when = document.createElement('span');
+          const date = document.createElement('b');
+          date.textContent = new Date(firstAt).toLocaleDateString(undefined,
+            { day: 'numeric', month: 'long', year: 'numeric' });
+          when.append('Counting since ', date);
+          const perDay = sinceCount / days;
+          const rate = document.createElement('b');
+          const gap = 1 / perDay;
+          rate.textContent = perDay >= 1.6 ? `about ${Math.round(perDay)} a day`
+            : perDay >= 0.8 ? 'about one a day'
+            : `about one every ${gap >= 10 ? Math.round(gap) : gap.toFixed(1)} days`;
+          const pace = document.createElement('span');
+          pace.append(rate);
+          since.append(when, pace);
         }
       }
     });
   }
+
+  let bloomTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(bloomTimer);
+    bloomTimer = setTimeout(drawBloom, 120);
+  });
 
   function formatDuration(seconds) {
     const s = Math.max(0, Math.round(Number(seconds) || 0));
