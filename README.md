@@ -32,19 +32,25 @@ This extension builds the index. It reads the video's own transcript, sends it t
 > [!NOTE]
 > **You bring the API key.** There is no server, no account and no subscription in between — the extension talks to your provider directly, and you pay them for what you generate. Google Gemini has a free tier that covers casual use.
 
+<div align="center">
+<img src="docs/screenshots/settings-your-usage.png" width="820" alt="The Your usage settings screen: a bloom of one seed per summary beside 118 summaries generated and 2d 19h of watching saved, then 83h of video against 15h of reading — 5.4 times shorter — and cells for the longest video, timestamps written and films-equivalent">
+</div>
+
+<p align="center"><sup>The trade, counted: 83 hours of video read back in 15. Kept on your machine, shown under <strong>Your usage</strong>.</sup></p>
+
 <br>
 
 ## A guided tour
 
 <div align="center">
-<img src="docs/screenshots/summary-generated.png" width="340" alt="The full panel after generating: an overview card reading 1:43:12 video, 42 points, 6 min read, above sectioned rows such as 0:42 Transforming Electrons to Tokens and 1:46 Nvidia's Core Philosophy">
+<img src="docs/screenshots/summary-generated.png" width="340" alt="The full panel after generating: an overview card holding a paragraph about the video, with Show more, Copy and an In-depth badge, above sectioned rows such as 02:04 China's Strategic Preparations and 02:29 India-US Relations">
 </div>
 
 <p align="center"><sup>The whole panel. Below, what each part of it does.</sup></p>
 
 <table>
 <tr>
-<td width="45%"><img src="docs/screenshots/panel-empty-state.png" alt="The panel's empty state: a Timestamped Summary header with an In-depth detail chip and a settings gear, two placeholder rows, the line 'An overview, then chapters linked to the video', and a Generate summary button"></td>
+<td width="45%"><img src="docs/screenshots/panel-empty-state.png" alt="The panel's empty state: a Timestamped Summary header with an In-depth detail chip carrying a small density mark, and a settings gear, two placeholder rows, the line 'An overview, then chapters linked to the video', and a Generate summary button"></td>
 <td valign="top">
 
 ### Already in the sidebar
@@ -56,7 +62,7 @@ One button, and nothing is sent anywhere until you press it.
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/detail-selector.png" alt="The Detail selector open on In-depth, with Brief and Standard beside it, above the line 'Every topic, with concrete specifics.'"></td>
+<td><img src="docs/screenshots/detail-selector.png" alt="The Detail selector open on In-depth: a field of marks across the video's runtime reading about 36 points, a 0:00 to 1:12:42 scale beneath it, and Brief, Standard and In-depth as three stops, over a dimmed panel"></td>
 <td valign="top">
 
 ### Three levels of detail
@@ -229,6 +235,12 @@ The extension does not include an AI model. You point it at a provider you have 
 2. Answer one question — *where should the writing come from?* — and take **Use the free one** unless you already hold an API key. (A ChatGPT Plus or Claude Pro subscription is not an API key; those are billed separately.) The guide shows you exactly what to click on Google's page before it sends you there.
 3. Paste the key and press **Connect**. You don't have to say which provider it came from: the key's own shape identifies it, and the guide checks it with that provider before saving anything.
 4. Configure a second provider if you like. Once two or more are set up, a provider selector appears with an **Auto** option that tries each configured provider in turn if one fails.
+
+<div align="center">
+<img src="docs/screenshots/settings-your-ai.png" width="820" alt="The Your AI settings screen: a Summaries written by selector set to Auto, above cards for Google Gemini and Mistral, each showing a masked key, a Connected badge, a Replace key button and a model dropdown, then an Add Provider button">
+</div>
+
+<p align="center"><sup>Two providers configured, with <strong>Auto</strong> falling back between them.</sup></p>
 
 <br>
 
@@ -488,6 +500,12 @@ Set per video from the chip in the panel header; the last choice becomes your de
 
 Counts scale with the real runtime and are floored — not capped — so a long video produces a long summary. A three-minute clip scales *down* instead of padding out invented moments.
 
+<div align="center">
+<img src="docs/screenshots/settings-summaries.png" width="820" alt="The Summaries settings screen: Brief, Standard and In-depth as three cards with In-depth selected, then Auto, Light and Dark theme cards, then Refined and Original design cards, beside a live preview of the panel showing the overview card and timestamped rows">
+</div>
+
+<p align="center"><sup>Detail, theme and design on one screen, with a live preview of the panel they produce.</sup></p>
+
 ## Features
 
 | | |
@@ -504,7 +522,7 @@ Counts scale with the real runtime and are floored — not capped — so a long 
 | **Recovers from a missing transcript** | Falls back to the player's own caption track |
 | **Handles members-only videos** | If your signed-in account can play it, it can be summarised |
 | **Errors you can act on** | Every failure is categorised, explained, and offers Retry — plus Open settings where that's the fix |
-| **Local stats** | Summaries generated and estimated time saved, kept on your machine and shown in settings |
+| **Local stats** | Summaries generated and estimated time saved, kept on your machine and shown under **Your usage** |
 
 <div align="right"><a href="#timestamped-summary-for-youtube">↑ back to top</a></div>
 
