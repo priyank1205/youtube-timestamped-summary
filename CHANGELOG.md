@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.6.0 — 2026-09-16
+
 ### Removed
 
 - **Open with a gist**, the switch for the overview line above the timestamps.
