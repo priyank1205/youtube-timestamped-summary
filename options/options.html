@@ -1986,6 +1986,10 @@
       border: 0;
       border-radius: 0;
       box-shadow: none;
+      /* The card this shell grew out of clipped its own rounded corners. This
+         one is full-bleed and square, so the clip only cost the preview column
+         its sticky — the page is the scroller again. */
+      overflow: visible;
     }
 
     /* ---- rail: recessed below the window plane ---- */
@@ -2123,6 +2127,9 @@
       box-shadow: inset 1px 0 0 #1a1a20, inset 4px 0 10px -8px #000;
       padding: 34px 28px 30px; display: flex; flex-direction: column;
     }
+    /* Three sections make this screen taller than a window, and a preview you
+       have scrolled away from is no preview. It travels with you instead. */
+    .pane-stick { position: sticky; top: 34px; display: flex; flex-direction: column; }
     .bz-prevwrap { max-width: 412px; }
 
     /* Refined skin (the default) — tokens are 1:1 with --q-* in
@@ -2333,6 +2340,9 @@
 
     .bz-cap { margin-top: auto; padding-top: 18px; max-width: 412px; font-size: 11.5px; color: var(--bz-faint); line-height: 1.55; }
     .bz-cap b { color: var(--bz-mid); font-weight: 600; }
+    /* Two readings of one picture — what the summary holds, and how it is drawn. */
+    .bz-cap span { display: block; }
+    .bz-cap span + span { margin-top: 6px; }
 
     /* ---- statistics: one dot per summary ---- */
     .stat-hero { display: flex; align-items: center; gap: 28px; }
@@ -2867,11 +2877,6 @@
           <span class="nav-label">Summaries</span>
           <em class="nav-val" id="nav-val-detail">Standard</em>
         </button>
-        <button class="nav-item" data-pane="panel" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
-          <span class="nav-label">Panel</span>
-          <em class="nav-val" id="nav-val-theme">Auto</em>
-        </button>
         <button class="nav-item" data-pane="ai" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2m0-12-2 2M8 16l-2 2"/></svg>
           <span class="nav-label">Your AI</span>
@@ -2897,7 +2902,7 @@
         <div class="pane-main">
           <div class="pane-head">
             <div class="pane-title">Summaries</div>
-            <div class="pane-sub">How every new summary comes out. You can still change it on any video, from the panel.</div>
+            <div class="pane-sub">What every new summary says, and how the panel shows it. Detail can still be changed on any video, from the panel itself.</div>
           </div>
 
           <div class="sec">
@@ -2914,22 +2919,6 @@
               </button>
             </div>
             <p class="bz-hint" id="detail-effect"></p>
-          </div>
-        </div>
-
-        <aside class="pane-aside">
-          <p class="bz-k">Preview</p>
-          <div class="bz-prevwrap" id="preview-summaries"></div>
-          <p class="bz-cap" id="preview-cap-summaries"></p>
-        </aside>
-      </section>
-
-      <!-- Panel pane -->
-      <section class="pane split" id="pane-panel" role="tabpanel">
-        <div class="pane-main">
-          <div class="pane-head">
-            <div class="pane-title">Panel</div>
-            <div class="pane-sub">How the summary panel looks inside YouTube.</div>
           </div>
 
           <div class="sec">
@@ -2976,9 +2965,11 @@
         </div>
 
         <aside class="pane-aside">
-          <p class="bz-k">Preview</p>
-          <div class="bz-prevwrap" id="preview-panel"></div>
-          <p class="bz-cap" id="preview-cap-panel"></p>
+          <div class="pane-stick">
+            <p class="bz-k">Preview</p>
+            <div class="bz-prevwrap" id="preview-summaries"></div>
+            <p class="bz-cap" id="preview-cap-summaries"></p>
+          </div>
         </aside>
       </section>
 

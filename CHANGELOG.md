@@ -9,6 +9,18 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Changed
+
+- **Summaries** and **Panel** are one screen. They were showing the same
+  picture: both rendered the same preview from the same function, so the
+  settings page drew the panel twice and neither copy demonstrated the other
+  screen's controls — Detail could not show what it did to the look, and Theme
+  and Design could not show what Detail did to the density. Detail, Theme and
+  Design now sit together under **Summaries**, and all three drive one preview.
+  The sidebar has four destinations instead of five.
+- The preview stays with you as that screen scrolls, rather than sliding out of
+  view at the moment you reach Design.
+
 ## 1.6.0 — 2026-09-16
 
 ### Removed

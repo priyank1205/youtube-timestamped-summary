@@ -819,38 +819,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     const level = DETAIL_META[prefDetail] ? prefDetail : 'standard';
     const shape = previewShape(level);
 
-    // One theme decision for both previews: Auto follows YouTube, and the
-    // settings page assumes the dark YouTube it is sitting next to.
+    // Auto follows YouTube, and the settings page assumes the dark YouTube it
+    // is sitting next to.
     const light = prefTheme === 'light';
     renderPreview(document.getElementById('preview-summaries'), { light });
-    renderPreview(document.getElementById('preview-panel'), { light });
 
-    const capS = document.getElementById('preview-cap-summaries');
-    if (capS) {
-      capS.replaceChildren();
-      const b = document.createElement('b');
-      b.textContent = `${shape.target} points across ${shape.sections} section${shape.sections === 1 ? '' : 's'}`;
-      capS.append(b, ` on a ${PREVIEW_MINUTES}-minute video — one about every `
-        + `${Math.round(shape.gap)} minute${Math.round(shape.gap) === 1 ? '' : 's'}.`);
-    }
-    const capP = document.getElementById('preview-cap-panel');
-    if (capP) {
-      capP.replaceChildren();
-      const themeLine = prefTheme === 'light'
-        ? 'Always light, whatever theme YouTube is in.'
-        : prefTheme === 'dark'
-          ? 'Always dark, whatever theme YouTube is in.'
-          : 'YouTube is in dark right now, so Auto renders dark.';
-      const b = document.createElement('b');
-      b.textContent = prefSkin === 'classic' ? 'Original' : 'Refined';
-      capP.append(b, ' — ', themeLine);
-    }
+    // One picture, two readings: what the summary holds, and how it is drawn.
+    // Detail moves the first line, Theme and Design move the second.
+    const cap = document.getElementById('preview-cap-summaries');
+    if (!cap) return;
+
+    const density = document.createElement('span');
+    const count = document.createElement('b');
+    count.textContent = `${shape.target} points across ${shape.sections} `
+      + `section${shape.sections === 1 ? '' : 's'}`;
+    density.append(count, ` on a ${PREVIEW_MINUTES}-minute video — one about every `
+      + `${Math.round(shape.gap)} minute${Math.round(shape.gap) === 1 ? '' : 's'}.`);
+
+    const themeLine = prefTheme === 'light'
+      ? 'Always light, whatever theme YouTube is in.'
+      : prefTheme === 'dark'
+        ? 'Always dark, whatever theme YouTube is in.'
+        : 'YouTube is in dark right now, so Auto renders dark.';
+    const look = document.createElement('span');
+    const design = document.createElement('b');
+    design.textContent = prefSkin === 'classic' ? 'Original' : 'Refined';
+    look.append(design, ' — ', themeLine);
+
+    cap.replaceChildren(density, look);
   }
 
   // --- Panel theme ---
   // The three cards are miniature panels; `data-label` carries the word for the
-  // rail and the toast, because the button's own text also holds its description.
-  const navValTheme = document.getElementById('nav-val-theme');
+  // toast, because the button's own text also holds its description.
   const themeGroup = document.getElementById('theme-options');
   if (themeGroup) {
     const themeOptions = Array.from(themeGroup.querySelectorAll('[data-theme]'));
@@ -858,7 +859,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const chosen = themeOptions.find((o) => o.dataset.theme === pref) || themeOptions[0];
       themeOptions.forEach((o) => o.setAttribute('aria-checked', o === chosen ? 'true' : 'false'));
       prefTheme = chosen ? chosen.dataset.theme : 'system';
-      if (navValTheme && chosen) navValTheme.textContent = chosen.dataset.label;
       refreshPreviews();
     };
     chrome.storage.local.get(['THEME_PREF'], (res) => setActiveTheme(res.THEME_PREF || 'system'));
