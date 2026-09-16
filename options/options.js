@@ -33,6 +33,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const bannerIcon = document.getElementById('banner-icon');
   const bannerText = document.getElementById('intro-banner-text');
 
+  // --- Version -------------------------------------------------------------
+  //
+  // Printed from the manifest rather than typed into the markup. The page used
+  // to carry the number by hand, which is how it came to read v1.2 while the
+  // manifest said 1.4.0; `npm run bump` touches manifest.json and package.json
+  // only, so anything else holding the version goes stale the moment it runs.
+  try {
+    const version = chrome.runtime.getManifest().version;
+    document.querySelectorAll('[data-version]').forEach((el) => {
+      el.textContent = version;
+    });
+  } catch { /* Outside an extension context the markup's own value stands. */ }
+
   // --- Sidebar navigation (switch content panes) ---
   const navItems = Array.from(document.querySelectorAll('.nav-item'));
   const panes = Array.from(document.querySelectorAll('.pane'));

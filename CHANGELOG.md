@@ -9,6 +9,40 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.5.0 — 2026-09-16
+
+### Added
+
+- A **Summaries** screen holding the Detail level every new summary starts at.
+  It writes the same preference the panel's own Detail chip keeps, so changing
+  it here updates an open panel without a reload.
+- **Open with a gist**, a switch for the overview line above the timestamps.
+  The line is always written and travels inside the saved summary, so hiding it
+  costs nothing and turning it back on never needs another request.
+- A **Statistics** screen: one dot per summary generated, the estimated time
+  saved, the average per summary, and what that adds up to in feature films.
+  The estimate is labelled as arithmetic on your own counter, not a measurement.
+- A **live preview** on the Summaries and Panel screens showing the panel those
+  settings produce — the real point count and timestamp spacing for the chosen
+  Detail level, in the chosen theme and design.
+- A **model selector** on the provider card, visible while connected instead of
+  only inside the key form.
+
+### Changed
+
+- The settings page is rebuilt around five destinations — Summaries, Panel,
+  Your AI, Statistics, About — each one screen, with no modals between them.
+  It fills the window rather than sitting in a fixed-width card.
+- The panel design choice is no longer *Classic* and *Quiet (new)*. It is
+  **Original** and **Refined**, named for what the two designs do, and each has
+  a thumbnail and a preview instead of a word you have to have already seen.
+- A connected provider reads as a settled tile — mark, masked key, connection
+  state and model — with the key form as a drawer opened by **Replace key**.
+- About restates the privacy copy as a ledger of what leaves this computer,
+  alongside the exact host permissions the manifest requests.
+- The version is read from the manifest wherever the page prints it, so it can
+  no longer drift out of date the way it had (the page read v1.2 at 1.4.0).
+
 ## 1.4.0 — 2026-09-10
 
 ### Added
