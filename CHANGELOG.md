@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.9.1 — 2026-10-07
+
 ### Fixed
 
 - **The toolbar popup is in the release zip.** The manifest has declared a
