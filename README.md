@@ -17,7 +17,7 @@ A sectioned, timestamped AI summary lives in the YouTube sidebar — click any l
 
 [**Install**](#install) · [**Set up a key**](#step-3--add-an-api-key) · [**Troubleshooting**](#troubleshooting) · [**How it works**](#how-it-works) · [**Privacy**](#privacy-and-data-handling) · [**Development**](#development)
 
-<img src="docs/screenshots/panel-on-video-page.png" alt="The Timestamped Summary panel in the YouTube sidebar beside a playing video, showing an overview card above a list of clickable timestamped points">
+<img src="docs/screenshots/panel-on-video-page.webp" alt="The Timestamped Summary panel in the YouTube sidebar beside a playing video, showing an overview card above a list of clickable timestamped points">
 
 </div>
 
@@ -33,7 +33,7 @@ This extension builds the index. It reads the video's own transcript, sends it t
 > **You bring the API key.** There is no server, no account and no subscription in between — the extension talks to your provider directly, and you pay them for what you generate. Google Gemini has a free tier that covers casual use.
 
 <div align="center">
-<img src="docs/screenshots/settings-your-usage.png" width="820" alt="The Your usage settings screen: a bloom of one seed per summary beside 118 summaries generated and 2d 19h of watching saved, then 83h of video against 15h of reading — 5.4 times shorter — and cells for the longest video, timestamps written and films-equivalent">
+<img src="docs/screenshots/settings-your-usage.webp" width="820" alt="The Your usage settings screen: a bloom of one seed per summary beside 118 summaries generated and 2d 19h of watching saved, then 83h of video against 15h of reading — 5.4 times shorter — and cells for the longest video, timestamps written and films-equivalent">
 </div>
 
 <p align="center"><sup>The trade, counted: 83 hours of video read back in 15. Kept on your machine, shown under <strong>Your usage</strong>.</sup></p>
@@ -43,14 +43,14 @@ This extension builds the index. It reads the video's own transcript, sends it t
 ## A guided tour
 
 <div align="center">
-<img src="docs/screenshots/summary-generated.png" width="340" alt="The full panel after generating: an overview card holding a paragraph about the video, with Show more, Copy and an In-depth badge, above sectioned rows such as 02:04 China's Strategic Preparations and 02:29 India-US Relations">
+<img src="docs/screenshots/summary-generated.webp" width="340" alt="The full panel after generating: an overview card holding a paragraph about the video, with Show more, Copy and an In-depth badge, above sectioned rows such as 02:04 China's Strategic Preparations and 02:29 India-US Relations">
 </div>
 
 <p align="center"><sup>The whole panel. Below, what each part of it does.</sup></p>
 
 <table>
 <tr>
-<td width="45%"><img src="docs/screenshots/panel-empty-state.png" alt="The panel's empty state: a Timestamped Summary header with an In-depth detail chip carrying a small density mark, and a settings gear, two placeholder rows, the line 'An overview, then chapters linked to the video', and a Generate summary button"></td>
+<td width="45%"><img src="docs/screenshots/panel-empty-state.webp" alt="The panel's empty state: a Timestamped Summary header with an In-depth detail chip carrying a small density mark, and a settings gear, two placeholder rows, the line 'An overview, then chapters linked to the video', and a Generate summary button"></td>
 <td valign="top">
 
 ### Already in the sidebar
@@ -62,7 +62,7 @@ One button, and nothing is sent anywhere until you press it.
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/detail-selector.png" alt="The Detail selector open on In-depth: a field of marks across the video's runtime reading about 36 points, a 0:00 to 1:12:42 scale beneath it, and Brief, Standard and In-depth as three stops, over a dimmed panel"></td>
+<td><img src="docs/screenshots/detail-selector.webp" alt="The Detail selector open on In-depth: a field of marks across the video's runtime reading about 36 points, a 0:00 to 1:12:42 scale beneath it, and Brief, Standard and In-depth as three stops, over a dimmed panel"></td>
 <td valign="top">
 
 ### Three levels of detail
@@ -76,7 +76,7 @@ Counts come from the video's real runtime, so a two-hour talk earns more rows th
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/overview.png" alt="The overview card: a paragraph summarising the whole video, with Show less, Copy and an In-depth badge beneath it"></td>
+<td><img src="docs/screenshots/overview.webp" alt="The overview card: a paragraph summarising the whole video, with Show less, Copy and an In-depth badge beneath it"></td>
 <td valign="top">
 
 ### An overview before the outline
@@ -88,7 +88,7 @@ Enough to decide in five seconds whether to keep going.
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/click-timestamp.png" alt="A cursor hovering a summary row whose timestamp reads 4:32 in red with a play triangle, between the rows for 2:53 and 6:11"></td>
+<td><img src="docs/screenshots/click-timestamp.webp" alt="A cursor hovering a summary row whose timestamp reads 4:32 in red with a play triangle, between the rows for 2:53 and 6:11"></td>
 <td valign="top">
 
 ### Every row jumps the video
@@ -100,7 +100,7 @@ The point playing now stays marked as the video moves, so the list always shows 
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/timestamp-row-expanded.png" alt="A timestamp row expanded to show its explanation beneath the heading"></td>
+<td><img src="docs/screenshots/timestamp-row-expanded.webp" alt="A timestamp row expanded to show its explanation beneath the heading"></td>
 <td valign="top">
 
 ### Open a point for the detail
@@ -112,7 +112,7 @@ Often that answers the question, and the video never has to play at all.
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/panel-collapsed.png" alt="The panel collapsed to a single header row reading Timestamped Summary with a Start over control"></td>
+<td><img src="docs/screenshots/panel-collapsed.webp" alt="The panel collapsed to a single header row reading Timestamped Summary with a Start over control"></td>
 <td valign="top">
 
 ### Collapse it when you're watching
@@ -237,7 +237,7 @@ The extension does not include an AI model. You point it at a provider you have 
 4. Configure a second provider if you like. Once two or more are set up, a provider selector appears with an **Auto** option that tries each configured provider in turn if one fails.
 
 <div align="center">
-<img src="docs/screenshots/settings-your-ai.png" width="820" alt="The Your AI settings screen: a Summaries written by selector set to Auto, above cards for Google Gemini and Mistral, each showing a masked key, a Connected badge, a Replace key button and a model dropdown, then an Add Provider button">
+<img src="docs/screenshots/settings-your-ai.webp" width="820" alt="The Your AI settings screen: a Summaries written by selector set to Auto, above cards for Google Gemini and Mistral, each showing a masked key, a Connected badge, a Replace key button and a model dropdown, then an Add Provider button">
 </div>
 
 <p align="center"><sup>Two providers configured, with <strong>Auto</strong> falling back between them.</sup></p>
@@ -501,7 +501,7 @@ Set per video from the chip in the panel header; the last choice becomes your de
 Counts scale with the real runtime and are floored — not capped — so a long video produces a long summary. A three-minute clip scales *down* instead of padding out invented moments.
 
 <div align="center">
-<img src="docs/screenshots/settings-summaries.png" width="820" alt="The Summaries settings screen: Brief, Standard and In-depth as three cards with In-depth selected, then Auto, Light and Dark theme cards, then Refined and Original design cards, beside a live preview of the panel showing the overview card and timestamped rows">
+<img src="docs/screenshots/settings-summaries.webp" width="820" alt="The Summaries settings screen: Brief, Standard and In-depth as three cards with In-depth selected, then Auto, Light and Dark theme cards, then Refined and Original design cards, beside a live preview of the panel showing the overview card and timestamped rows">
 </div>
 
 <p align="center"><sup>Detail, theme and design on one screen, with a live preview of the panel they produce.</sup></p>
