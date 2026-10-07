@@ -1,0 +1,128 @@
+/* Film-only layer over the extension's real stylesheets.
+   The end states always come from styles/content.css + styles/skin-quiet.css;
+   this file only (1) switches CSS transitions off, because a film frame has no
+   "previous frame" to transition from, and (2) re-expresses those same
+   transitions as custom properties the film sets per frame, using the same
+   durations and curves. Keyframe animations are left alone and driven
+   frame-accurately through the Web Animations API (see lib/anim.ts). */
+
+.yt-timestamps-container,
+.yt-timestamps-container *,
+.yt-timestamps-container *::before,
+.yt-timestamps-container *::after {
+  transition: none !important;
+}
+
+/* Row hover / open-row tint, by --ph in 0..1 */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.p-hov {
+  background: color-mix(in srgb, var(--q-hover) calc(var(--ph, 0) * 100%), transparent);
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now.p-hov {
+  background: var(--q-hover);
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.p-hov:not(.yt-now) .yt-time {
+  background: color-mix(in srgb, var(--q-accent-tint) calc(var(--ph, 0) * 100%), var(--q-chip));
+  color: color-mix(in srgb, var(--q-accent-text) calc(var(--ph, 0) * 100%), var(--q-text-2)) !important;
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-past.p-hov:not(.yt-now) .yt-time {
+  background: color-mix(in srgb, var(--q-accent-tint) calc(var(--ph, 0) * 100%), transparent);
+  color: color-mix(in srgb, var(--q-accent-text) calc(var(--ph, 0) * 100%), var(--q-text-3)) !important;
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.p-hov:not(.yt-now) .yt-time::before {
+  opacity: var(--ph, 0);
+  transform: translateY(-50%) scale(calc(0.6 + 0.4 * var(--ph, 0)));
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.p-hov:not(.yt-now) .yt-time-text {
+  transform: translateX(calc(3px * var(--ph, 0)));
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.p-hov .yt-expand-btn {
+  color: color-mix(in srgb, var(--q-text-1) calc(var(--ph, 0) * 100%), var(--q-text-3)) !important;
+}
+
+/* Expand chevron, rotated by --pv (degrees) */
+.yt-timestamps-container.yt-skin-quiet .yt-expand-btn.p-chev::after {
+  transform: rotate(calc(var(--pv, 45) * 1deg));
+}
+
+/* Accordion description, height/padding/opacity by custom properties */
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-content.p-exp {
+  height: var(--pe-h, 0px);
+  padding-top: var(--pe-pt, 0px) !important;
+  padding-bottom: var(--pe-pb, 0px) !important;
+  opacity: var(--pe-o, 0) !important;
+}
+
+/* Collapse toggle chevron */
+.yt-timestamps-container .yt-accordion-toggle-icon.p-tog {
+  transform: rotate(calc(var(--pt, -90) * 1deg));
+}
+
+/* Detail chip hover, by --ph */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip.p-chip:not(.open) {
+  background: color-mix(in srgb, var(--q-chip-hover) calc(var(--ph, 0) * 100%), var(--q-chip));
+  color: color-mix(in srgb, var(--q-text-1) calc(var(--ph, 0) * 100%), var(--q-text-2));
+}
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip.p-chip .yt-detail-chip-caret {
+  transform: rotate(calc(var(--pc, 0) * 1deg));
+}
+
+/* Five-bar density glyph in the chip, each bar by --pg */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-glyph i.p-g {
+  height: calc(3px * (1 - var(--pg, 0)) + var(--pgh) * var(--pg, 0));
+  opacity: calc(0.35 + 0.65 * var(--pg, 0));
+}
+
+/* Density field bars, each by --pb (0 = off, 1 = on) */
+.yt-timestamps-container.yt-skin-quiet .yt-comb-bar.p-bar {
+  height: calc(4px * (1 - var(--pb, 0)) + var(--yt-comb-h) * var(--pb, 0));
+  background: color-mix(in srgb, var(--q-bar-on) calc(var(--pb, 0) * 100%), var(--q-bar));
+  opacity: calc(0.55 + 0.45 * var(--pb, 0));
+  box-shadow: 0 0 6px rgba(255, 92, 92, calc(0.45 * var(--pb, 0)));
+}
+
+/* Level stops, active by --pa and hover by --ph */
+.yt-timestamps-container.yt-skin-quiet .yt-comb-stop.p-stop {
+  background: color-mix(in srgb, var(--q-stop-on-bg) calc(var(--pa, 0) * 100%), transparent);
+  color: color-mix(in srgb, var(--q-stop-on-text) calc(var(--pa, 0) * 100%),
+    color-mix(in srgb, var(--q-mod-text) calc(var(--ph, 0) * 100%), var(--q-mod-dim)));
+}
+
+/* Generate button hover tint and press, by --ph / --pp */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button.p-gen:not(:disabled) {
+  background: color-mix(in srgb, var(--q-accent-tint) calc(var(--ph, 0) * 100%), var(--q-chip));
+  color: color-mix(in srgb, var(--q-accent-text) calc(var(--ph, 0) * 100%), var(--q-text-1));
+  transform: scale(calc(1 - 0.015 * var(--pp, 0)));
+}
+
+/* The panel inherits YouTube's type; its buttons do too on youtube.com. */
+.yt-timestamps-container button { font-family: inherit; }
+.yt-timestamps-container .yt-comb-stop { font-family: var(--q-mono); }
+
+/* The scrollbar the panel draws on YouTube, painted as an element here because
+   the film's renderer hides native scrollbars. Matches skin-quiet.css. */
+.p-scrollbar {
+  position: absolute;
+  right: 0;
+  width: 8px;
+  z-index: 4;
+  pointer-events: none;
+}
+.p-scrollbar > i {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Pseudo-element animations (hairline loader, completion sweep, seek pulse),
+   pinned to the film's clock through custom properties set on their hosts. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating::after,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-done-sweep::after {
+  animation-play-state: paused !important;
+  animation-delay: calc(var(--p-at, 0) * -1s) !important;
+}
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-seek-pulse::before {
+  animation-play-state: paused !important;
+  animation-delay: calc(var(--p-pulse, 0) * -1s) !important;
+}

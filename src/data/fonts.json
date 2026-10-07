@@ -1,0 +1,46 @@
+{
+ "Roboto": {
+  "family": "Roboto",
+  "range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  "files": {
+   "400": "Roboto-KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+   "500": "Roboto-KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+   "700": "Roboto-KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2"
+  }
+ },
+ "InterTight": {
+  "family": "Inter Tight",
+  "range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  "files": {
+   "500": "InterTight-NGSwv5HMAFg6IuGlBNMjxLsH8ag.woff2",
+   "600": "InterTight-NGSwv5HMAFg6IuGlBNMjxLsH8ag.woff2",
+   "700": "InterTight-NGSwv5HMAFg6IuGlBNMjxLsH8ag.woff2",
+   "800": "InterTight-NGSwv5HMAFg6IuGlBNMjxLsH8ag.woff2"
+  }
+ },
+ "Inter": {
+  "family": "Inter",
+  "range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  "files": {
+   "400": "Inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+   "500": "Inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+   "600": "Inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2"
+  }
+ },
+ "InstrumentSerif": {
+  "family": "Instrument Serif",
+  "style": "normal",
+  "range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  "files": {
+   "400": "InstrumentSerif-normal-jizBRFtNs2ka5fXjeivQ4LroWlx-6zUTjg.woff2"
+  }
+ },
+ "InstrumentSerifItalic": {
+  "family": "Instrument Serif",
+  "style": "italic",
+  "range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  "files": {
+   "400": "InstrumentSerif-italic-jizHRFtNs2ka5fXjeivQ4LroWlx-6zAjjH7M.woff2"
+  }
+ }
+}
