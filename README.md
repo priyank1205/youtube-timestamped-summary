@@ -576,9 +576,9 @@ npm run check
 |---|---|
 | `npm run check` | Manifest/version check, then the full unit suite |
 | `npm test` | Unit tests only — transcript regression, caption capture and fallback, request routing, navigation, windowing, summary validation |
-| `npm run test:manifest` | Proves the manifest points at files that exist and both version files agree |
+| `npm run test:manifest` | Proves the manifest, and every page and module it leads to, points at files that exist, and that both version files agree |
 | `npm run test:browser` | Serves the browser harness at `http://127.0.0.1:8765/tests/caption-reader-browser.html` for JSON3/XML parsing and real `fetch`/XHR capture checks |
-| `npm run package` | Writes `dist/timestamped-summary-for-youtube-v<version>.zip` with only the files the manifest loads |
+| `npm run package` | Writes `dist/timestamped-summary-for-youtube-v<version>.zip` with only the files the manifest loads, then unpacks it and fails if any of them is missing |
 | `npm run bump -- patch` | Raises the version in `manifest.json` **and** `package.json` and moves the Unreleased changelog section under it |
 
 All checks use fixture captions and make **no YouTube or LLM requests**.

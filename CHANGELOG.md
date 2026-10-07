@@ -9,6 +9,23 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Fixed
+
+- **The toolbar popup is in the release zip.** The manifest has declared a
+  popup since 1.4.0, but the packaging script never copied the `popup/` folder,
+  so every zip from 1.4.0 through 1.9.0 shipped without it and the popup had no
+  page to open. Installs from a clone of the repo were never affected: they
+  load the folder itself, popup included.
+- **A release can no longer leave out a file the extension loads.**
+  `npm run package` now unpacks the zip it just built and checks it: everything
+  the manifest names, the scripts, stylesheets and images those pages load, and
+  every module those scripts import, all the way down. Anything missing deletes
+  the zip and fails the build, and CI and the release workflow both package, so
+  a forgotten folder stops a release instead of shipping in one.
+  `npm run test:manifest` walks the same chain through the repo, so the popup
+  and the options page have their imports checked now, not just the service
+  worker.
+
 ## 1.9.0 — 2026-09-16
 
 ### Changed

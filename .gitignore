@@ -9,3 +9,6 @@ audit/
 # Build output and tooling
 dist/
 node_modules/
+
+# Promo video work in progress; not part of the extension or the repo
+video/

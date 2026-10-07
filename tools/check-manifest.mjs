@@ -6,13 +6,21 @@
 // and a version that drifts between manifest.json and package.json produces a
 // release zip whose name doesn't match what it installs as.
 //
-// Run: node tools/check-manifest.mjs
+// Given a directory, it checks that directory as a built package instead of the
+// repo. tools/package.sh points it at the unpacked release zip, so a source
+// directory the zip leaves out fails the build: v1.4.0 through v1.9.0 declared
+// a toolbar popup and shipped without popup/, and nothing noticed.
+//
+// Run: node tools/check-manifest.mjs [package-dir]
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const PACKAGE_DIR = process.argv[2];
+const ROOT = PACKAGE_DIR
+    ? resolve(PACKAGE_DIR)
+    : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const problems = [];
 
 function readJson(relPath) {
@@ -25,12 +33,16 @@ function readJson(relPath) {
 }
 
 const manifest = readJson('manifest.json');
-const pkg = readJson('package.json');
+// package.json is repo tooling and never ships, so the version check below only
+// runs against the repo.
+const pkg = PACKAGE_DIR ? null : readJson('package.json');
 
 // --- referenced files exist -------------------------------------------------
 
 // Every manifest field that names a file, flattened to {field, path} pairs so a
-// failure can say which key pointed at the missing file.
+// failure can say which key pointed at the missing file. Keys this manifest
+// doesn't use yet are listed too, so adding a side panel or a locale later is
+// checked without anyone remembering to come back here.
 function manifestFileRefs(m) {
     const refs = [];
     const add = (field, value) => {
@@ -40,11 +52,24 @@ function manifestFileRefs(m) {
     add('background.service_worker', m.background?.service_worker);
     add('options_page', m.options_page);
     add('options_ui.page', m.options_ui?.page);
+    add('side_panel.default_path', m.side_panel?.default_path);
+    add('devtools_page', m.devtools_page);
+    for (const [page, path] of Object.entries(m.chrome_url_overrides || {})) {
+        add(`chrome_url_overrides.${page}`, path);
+    }
+    (m.sandbox?.pages || []).forEach(p => add('sandbox.pages', p));
+    if (m.default_locale) add('default_locale', `_locales/${m.default_locale}/messages.json`);
 
     for (const [size, path] of Object.entries(m.icons || {})) add(`icons.${size}`, path);
     add('action.default_popup', m.action?.default_popup);
-    for (const [size, path] of Object.entries(m.action?.default_icon || {})) {
-        add(`action.default_icon.${size}`, path);
+    // default_icon may be a single path rather than a size map.
+    const actionIcon = m.action?.default_icon;
+    if (typeof actionIcon === 'string') {
+        add('action.default_icon', actionIcon);
+    } else {
+        for (const [size, path] of Object.entries(actionIcon || {})) {
+            add(`action.default_icon.${size}`, path);
+        }
     }
 
     (m.content_scripts || []).forEach((entry, i) => {
@@ -62,33 +87,67 @@ function manifestFileRefs(m) {
     return refs;
 }
 
+// --- and so does everything they load ---------------------------------------
+
+// The manifest names entry points; what those load is invisible to it. The
+// popup page loads popup.js, which imports scripts/providers.js, which imports
+// each provider's client, so a module renamed, or a directory left out of the
+// package, fails nothing until that page or the service worker breaks in
+// Chrome. Each file reached is therefore read for what it loads in turn (a
+// page's <script>, <link> and <img>; a script's relative imports and its
+// chrome.runtime.getURL('…') targets), and those have to exist too.
+const PAGE_REFS = /<(?:script|link|img)\b[^>]*?\s(?:src|href)\s*=\s*["']([^"']+)["']/gi;
+const IMPORTS = /\bfrom\s+['"](\.[^'"]+)['"]|\bimport\s*\(?\s*['"](\.[^'"]+)['"]/g;
+const GET_URL = /\bgetURL\(\s*['"]([^'"]+)['"]/g;
+
+const reached = new Set();
+
+// Resolve `ref` the way Chrome does, against `base` or, with a leading '/',
+// against the extension root, and record a problem unless it names a file
+// inside the root. Anything with a scheme (https:, data:, mailto:) or a bare
+// fragment isn't a file in the package, and a query or fragment on a file
+// doesn't change which file it is.
+function need(from, ref, base, problem) {
+    if (/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return;
+    const file = ref.replace(/[?#].*$/, '');
+    const path = relative(ROOT, file.startsWith('/') ? join(ROOT, file) : resolve(base, file));
+    if (path.startsWith('..') || isAbsolute(path)) {
+        // Chrome won't load it, and in a package unpacked inside the repo it
+        // could otherwise be "found" in the source tree.
+        problems.push(`${from} points outside the extension: ${ref}`);
+    } else if (!existsSync(join(ROOT, path))) {
+        problems.push(`${from} ${problem}: ${ref}`);
+    } else {
+        follow(path);
+    }
+}
+
+function follow(path) {
+    if (reached.has(path)) return;
+    reached.add(path);
+    const abs = join(ROOT, path);
+    if (path.endsWith('.html')) {
+        // A commented-out tag loads nothing.
+        const page = readFileSync(abs, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+        for (const [, ref] of page.matchAll(PAGE_REFS)) {
+            need(path, ref, dirname(abs), 'loads a missing file');
+        }
+    } else if (path.endsWith('.js')) {
+        const source = readFileSync(abs, 'utf8');
+        for (const match of source.matchAll(IMPORTS)) {
+            need(path, match[1] || match[2], dirname(abs), 'imports a missing module');
+        }
+        for (const [, ref] of source.matchAll(GET_URL)) {
+            need(path, ref, ROOT, 'refers to a missing file');
+        }
+    }
+}
+
 if (manifest) {
     for (const { field, path } of manifestFileRefs(manifest)) {
-        if (!existsSync(join(ROOT, path))) {
-            problems.push(`manifest ${field} points at a missing file: ${path}`);
-        }
+        need(`manifest ${field}`, path, ROOT, 'points at a missing file');
     }
 }
-
-// --- relative imports resolve ----------------------------------------------
-
-// The service worker's own imports are invisible to the manifest, so a module
-// renamed under scripts/ breaks generation with nothing failing until runtime.
-function checkImports(relFile) {
-    const abs = join(ROOT, relFile);
-    if (!existsSync(abs)) return;
-    const source = readFileSync(abs, 'utf8');
-    const pattern = /\bfrom\s+['"](\.[^'"]+)['"]|\bimport\s+['"](\.[^'"]+)['"]/g;
-    for (const match of source.matchAll(pattern)) {
-        const spec = match[1] || match[2];
-        const target = resolve(dirname(abs), spec);
-        if (!existsSync(target)) {
-            problems.push(`${relFile} imports a missing module: ${spec}`);
-        }
-    }
-}
-
-checkImports('background/service-worker.js');
 
 // --- versions agree ---------------------------------------------------------
 
@@ -114,9 +173,11 @@ if (manifest && pkg) {
 // --- report -----------------------------------------------------------------
 
 if (problems.length) {
-    console.error('Manifest check failed:');
+    console.error(PACKAGE_DIR ? 'Package check failed:' : 'Manifest check failed:');
     for (const problem of problems) console.error(`  - ${problem}`);
     process.exit(1);
 }
 
-console.log(`Manifest check passed (version ${manifest.version}).`);
+console.log(PACKAGE_DIR
+    ? `Package check passed: all ${reached.size} files the extension loads are present.`
+    : `Manifest check passed (version ${manifest.version}).`);
