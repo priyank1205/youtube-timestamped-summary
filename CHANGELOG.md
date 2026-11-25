@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.10.0 — 2026-11-25
+
 ### Added
 
 - **Summaries through your Claude or ChatGPT subscription.** Two new providers,
