@@ -255,7 +255,97 @@ const RETRYABLE_CODES = new Set([
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function generateWindowed(client, apiKey, windows, options, onProgress, shouldStop) {
+// How long to wait before each further attempt, by what went wrong. A 503 is
+// almost always Google's "this model is experiencing high demand", which passes
+// in tens of seconds, not the second or two a per-minute rate limit needs; three
+// quick tries just spent the spike failing. Running out of waits means giving up.
+export const RETRY_WAITS = {
+  [ERROR_CODES.PROVIDER_DOWN]: [5000, 12000, 25000],
+  default: [1500, 3000]
+};
+
+// One provider call, retried through the transient failures. `onWait` hears
+// about each pause, so the panel can say why nothing is arriving (and so its
+// idle timeout sees the run is still alive).
+export async function callWithRetries(call, { shouldStop = () => false, signal, onWait, label = 'Request', wait = sleep } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call();
+    } catch (err) {
+      const code = err?.code || classifyError(err).code;
+      const waits = RETRY_WAITS[code] || RETRY_WAITS.default;
+      if (attempt >= waits.length || !RETRYABLE_CODES.has(code) || shouldStop() || signal?.aborted) throw err;
+      // Jitter: parts that failed in the same moment must not come back in
+      // lockstep and hit the same wall together.
+      const ms = waits[attempt] + Math.random() * 1000;
+      console.warn(`${label} failed (${code}), retrying in ${Math.round(ms / 1000)}s...`);
+      await onWait?.(code, ms);
+      await wait(ms);
+      if (shouldStop() || signal?.aborted) throw err;
+    }
+  }
+}
+
+// What the panel says while a retry waits.
+export function retryMessage(code, ms) {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return code === ERROR_CODES.PROVIDER_DOWN
+    ? `The model is busy, trying again in ${seconds}s...`
+    : `Retrying in ${seconds}s...`;
+}
+
+// Parts that finished in a run that then failed. Without them, Try again after
+// one part hit a busy model pays for every part again, and on a free tier that
+// allows 20 requests a day that is most of the day. Kept in session storage so
+// they outlive the service worker going idle between attempts, and are gone
+// when the browser closes. Only a few recent runs are kept.
+const PART_CACHE_KEY = 'FINISHED_PARTS';
+const PART_CACHE_RUNS = 4;
+
+// A window is only the same window if its transcript is: FNV-1a over the text.
+function fingerprint(text) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length}.${(hash >>> 0).toString(16)}`;
+}
+
+// `run` names everything that shapes the prompt (video, provider, model,
+// detail level, ...), so a part is only reused for the request it answered.
+export function partCacheFor(run, store = globalThis.chrome?.storage?.session) {
+  if (!store?.get || !store?.set) return null;
+  const partKey = (window) => `${window.index}/${window.count}:${fingerprint(window.transcript || '')}`;
+  // Parts finish in parallel; each write reads the latest list first.
+  let queue = Promise.resolve();
+  const update = (change) => {
+    queue = queue.then(async () => {
+      const runs = (await store.get(PART_CACHE_KEY))[PART_CACHE_KEY] || [];
+      const rest = runs.filter((entry) => entry.run !== run);
+      const mine = runs.find((entry) => entry.run === run) || { run, parts: {} };
+      const next = change(mine);
+      await store.set({ [PART_CACHE_KEY]: (next ? [...rest, next] : rest).slice(-PART_CACHE_RUNS) });
+    }).catch((err) => console.warn('Part cache write failed:', err?.message));
+    return queue;
+  };
+  return {
+    async get(window) {
+      try {
+        const runs = (await store.get(PART_CACHE_KEY))[PART_CACHE_KEY] || [];
+        const text = runs.find((entry) => entry.run === run)?.parts?.[partKey(window)];
+        return typeof text === 'string' && text ? text : null;
+      } catch {
+        return null;
+      }
+    },
+    set: (window, text) => update((mine) => ({ run, parts: { ...mine.parts, [partKey(window)]: text } })),
+    clear: () => update(() => null)
+  };
+}
+
+export async function generateWindowed(client, apiKey, windows, allOptions, onProgress, shouldStop) {
+  const { partCache, concurrency = WINDOW_CONCURRENCY, ...options } = allOptions;
   const parts = new Array(windows.length);
   let next = 0;
   let completed = 0;
@@ -263,29 +353,25 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
 
   const report = () => onProgress(`Generating summary... ${completed}/${windows.length} parts`);
 
-  // One window, with a couple of attempts held back for the transient case.
-  // Running four calls at once is exactly what makes a per-minute limit likely,
-  // so the retry is part of the parallelism rather than a separate nicety.
-  const requestWindow = async (window) => {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await client.callAPI(apiKey, window.transcript, {
-          ...options,
-          // The window's own runtime prices its share of the points, so the
-          // video's total is the sum of its parts rather than one capped number.
-          durationMinutes: window.durationMinutes,
-          window
-        });
-      } catch (err) {
-        const code = err?.code || classifyError(err).code;
-        if (attempt >= 2 || !RETRYABLE_CODES.has(code) || shouldStop() || options.signal?.aborted) throw err;
-        console.warn(`Part ${window.index}/${window.count} failed (${code}), retrying...`);
-        // Backoff with jitter: parts that hit the same limit in the same moment
-        // must not come back in lockstep and hit it again together.
-        await sleep((attempt + 1) * 1500 + Math.random() * 500);
-      }
+  // One window, with attempts held back for the transient case. Running four
+  // calls at once is exactly what makes a per-minute limit likely, so the
+  // retry is part of the parallelism rather than a separate nicety.
+  const requestWindow = (window) => callWithRetries(
+    () => client.callAPI(apiKey, window.transcript, {
+      ...options,
+      // The window's own runtime prices its share of the points, so the
+      // video's total is the sum of its parts rather than one capped number.
+      durationMinutes: window.durationMinutes,
+      window
+    }),
+    {
+      shouldStop,
+      signal: options.signal,
+      label: `Part ${window.index}/${window.count}`,
+      wait: options.wait,
+      onWait: (code, ms) => onProgress(retryMessage(code, ms))
     }
-  };
+  );
 
   const worker = async () => {
     while (!failure && !shouldStop()) {
@@ -293,6 +379,15 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
       if (index >= windows.length) return;
       const window = windows[index];
       try {
+        // Finished in an earlier attempt at this same request: not asked again.
+        const kept = await partCache?.get(window);
+        if (kept) {
+          parts[index] = kept;
+          completed++;
+          await report();
+          continue;
+        }
+
         const reply = await requestWindow(window);
 
         // A window cut off at its output limit would leave a hole exactly where
@@ -315,6 +410,7 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
         // Stored by index, not appended: parts finish out of order, and the
         // joined timeline has to be the video's order, not the network's.
         parts[index] = text;
+        await partCache?.set(window, text);
         completed++;
         await report();
       } catch (err) {
@@ -326,7 +422,7 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
 
   await report();
   await Promise.all(
-    Array.from({ length: Math.min(WINDOW_CONCURRENCY, windows.length) }, worker)
+    Array.from({ length: Math.min(concurrency, windows.length) }, worker)
   );
 
   if (failure) throw failure;
@@ -336,6 +432,8 @@ export async function generateWindowed(client, apiKey, windows, options, onProgr
   if (parts.some((part) => typeof part !== 'string')) {
     throw apiError(ERROR_CODES.BAD_OUTPUT, 'A part of the summary was never generated.');
   }
+  // Every part is in hand; the next request for this video starts fresh.
+  await partCache?.clear();
   return { text: parts.join('\n'), finishReason: null };
 }
 
@@ -500,7 +598,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // Keys and the custom-provider list change what `providerReady` answers; the
   // rest are the preferences the panel renders directly.
   const relevant = Object.keys(changes).some((key) =>
-    key.endsWith('_API_KEY') || key === 'CUSTOM_PROVIDERS' ||
+    key.endsWith('_API_KEY') || key.endsWith('_SUBSCRIPTION') || key === 'CUSTOM_PROVIDERS' ||
     ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN'].includes(key));
   if (relevant) {
     broadcastPanelPrefs();
@@ -754,12 +852,17 @@ async function handleAnalysis(binding, sendResponse, length) {
     console.log(`Transcript cues: ${cues.length}, duration (min): ${summaryOptions.durationMinutes}`);
 
     // Long videos are summarised in windows rather than in one request; an
-    // empty plan means this one is short enough to go whole.
-    const windows = planWindows(transcriptResponse.data, cues);
-    if (windows.length) {
-      console.log(`Windowing into ${windows.length} parts: ` +
-        windows.map((w) => `${w.startLabel}-${w.endLabel}`).join(', '));
-    }
+    // empty plan means this one is short enough to go whole. The plan depends
+    // on the provider (see `windowing` in providers.js), so it is made per
+    // candidate below.
+    const planFor = (provider) => {
+      const plan = planWindows(transcriptResponse.data, cues, provider.windowing || {});
+      if (plan.length) {
+        console.log(`Windowing into ${plan.length} parts for ${provider.id}: ` +
+          plan.map((w) => `${w.startLabel}-${w.endLabel}`).join(', '));
+      }
+      return plan;
+    };
 
     // 4. Call each candidate in turn until one produces a summary that
     //    validates against the transcript.
@@ -793,11 +896,33 @@ async function handleAnalysis(binding, sendResponse, length) {
         console.log(`Calling ${providerId} API with model ${summaryOptions.modelId}...`);
         const client = getClient(providerId, allProviders);
         const apiKey = storage[provider.storageKey];
+        const windows = planFor(provider);
+        // A streaming client reports each chunk it receives. Forwarded at most
+        // every few seconds, that keeps the panel's idle timeout from cutting
+        // off a model that is visibly still writing.
+        let lastBeat = 0;
+        const onActivity = () => {
+          const now = Date.now();
+          if (now - lastBeat < 5000 || stale()) return;
+          lastBeat = now;
+          sendProgress(binding, "alive").catch(() => {});
+        };
         const reply = windows.length
-          ? await generateWindowed(client, apiKey, windows, { ...summaryOptions, signal },
+          ? await generateWindowed(client, apiKey, windows, {
+              ...summaryOptions, signal, onActivity,
+              concurrency: provider.windowing?.concurrency,
+              partCache: partCacheFor(JSON.stringify({ videoId, providerId, ...summaryOptions }))
+            },
               (message) => sendProgress(binding, "calling_api", { message }),
               stale)
-          : await client.callAPI(apiKey, transcriptResponse.data, { ...summaryOptions, signal });
+          : await callWithRetries(
+              () => client.callAPI(apiKey, transcriptResponse.data, { ...summaryOptions, signal, onActivity }),
+              {
+                shouldStop: stale,
+                signal,
+                label: providerId,
+                onWait: (code, ms) => sendProgress(binding, "calling_api", { message: retryMessage(code, ms) })
+              });
         if (stale()) return cancelled();
 
         // A reply is not a summary until its timestamps have been checked

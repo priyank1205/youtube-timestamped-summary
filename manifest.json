@@ -13,6 +13,9 @@
     "https://api.openai.com/*",
     "https://api.anthropic.com/*"
   ],
+  "optional_permissions": [
+    "nativeMessaging"
+  ],
   "optional_host_permissions": [
     "https://*/*",
     "http://localhost/*",

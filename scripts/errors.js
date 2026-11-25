@@ -28,6 +28,7 @@ export const ERROR_CODES = {
   BLOCKED: 'blocked',
   PROVIDER_DOWN: 'provider_down',
   BUSY: 'busy',
+  LOCAL_HELPER: 'local_helper',
   UNKNOWN: 'unknown'
 };
 
@@ -110,6 +111,11 @@ const CATEGORIES = {
   [ERROR_CODES.BUSY]: {
     title: 'A summary is already being generated',
     detail: 'Wait for the current one to finish, or reload the page to start over.'
+  },
+  [ERROR_CODES.LOCAL_HELPER]: {
+    title: "The subscription helper isn't set up",
+    detail: 'Summaries through your Claude or ChatGPT subscription need the helper installed on this computer. Settings explains how.',
+    settings: true
   },
   [ERROR_CODES.UNKNOWN]: {
     title: 'Something went wrong',

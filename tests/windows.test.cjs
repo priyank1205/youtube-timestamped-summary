@@ -117,7 +117,7 @@ test('a rate-limited part is retried; a rejected key is not', async () => {
   const windows = [{ index: 1, count: 2, transcript: 'a', durationMinutes: 43 },
                    { index: 2, count: 2, transcript: 'b', durationMinutes: 43 }];
 
-  const ok = await generateWindowed(flaky, 'k', windows, {}, async () => {}, () => false);
+  const ok = await generateWindowed(flaky, 'k', windows, { wait: async () => {} }, async () => {}, () => false);
   assert.ok(ok.text.includes('T: d.'));
   assert.equal(attempts, 3, 'one retry plus the two successful calls');
 
@@ -158,4 +158,114 @@ test('progress counts completed parts', async () => {
   await generateWindowed(client, 'k', windows, {}, async (m) => seen.push(m), () => false);
   assert.equal(seen[0], 'Generating summary... 0/3 parts');
   assert.equal(seen.at(-1), 'Generating summary... 3/3 parts');
+});
+
+test('a busy model (503) is waited out longer, and given up on after its last wait', async () => {
+  const { callWithRetries, RETRY_WAITS, retryMessage } = await load('../background/service-worker.js');
+  const { apiError, ERROR_CODES } = await load('../scripts/errors.js');
+  const busy = () => apiError(ERROR_CODES.PROVIDER_DOWN, 'high demand', 503);
+
+  const waited = [];
+  const notices = [];
+  let calls = 0;
+  const reply = await callWithRetries(async () => {
+    if (++calls < 3) throw busy();
+    return 'done';
+  }, { wait: async (ms) => waited.push(ms), onWait: (code, ms) => notices.push(retryMessage(code, ms)) });
+  assert.equal(reply, 'done');
+  assert.equal(waited.length, 2);
+  assert.ok(waited[0] >= RETRY_WAITS[ERROR_CODES.PROVIDER_DOWN][0], 'a 503 waits longer than a rate limit');
+  assert.ok(waited[1] > waited[0], 'and backs off');
+  assert.match(notices[0], /busy, trying again in \d+s/);
+
+  let tries = 0;
+  await assert.rejects(
+    callWithRetries(async () => { tries++; throw busy(); }, { wait: async () => {} }),
+    /high demand/
+  );
+  assert.equal(tries, RETRY_WAITS[ERROR_CODES.PROVIDER_DOWN].length + 1);
+
+  let stopped = 0;
+  await assert.rejects(
+    callWithRetries(async () => { stopped++; throw busy(); }, { wait: async () => {}, shouldStop: () => stopped > 0 }),
+    /high demand/
+  );
+  assert.equal(stopped, 1, 'a run that was cancelled does not retry');
+});
+
+test('Try again reuses parts that finished in the failed run, and success clears them', async () => {
+  const { generateWindowed, partCacheFor } = await load('../background/service-worker.js');
+  const { apiError, ERROR_CODES } = await load('../scripts/errors.js');
+
+  // An in-memory stand-in for chrome.storage.session.
+  const data = {};
+  const store = {
+    get: async (key) => (key in data ? { [key]: structuredClone(data[key]) } : {}),
+    set: async (obj) => { Object.assign(data, structuredClone(obj)); }
+  };
+  const windows = [{ index: 1, count: 2, transcript: 'a', durationMinutes: 43 },
+                   { index: 2, count: 2, transcript: 'b', durationMinutes: 43 }];
+  const opts = (run) => ({ wait: async () => {}, partCache: partCacheFor(run, store) });
+
+  const asked = [];
+  let partTwoDown = true;
+  const client = {
+    callAPI: async (_k, transcript) => {
+      asked.push(transcript);
+      if (transcript === 'b' && partTwoDown) throw apiError(ERROR_CODES.AUTH, 'part two failed', 401);
+      return { text: `[00:01] - ${transcript}: d.`, finishReason: 'stop' };
+    }
+  };
+
+  await assert.rejects(() => generateWindowed(client, 'k', windows, opts('run-1'), async () => {}, () => false), /part two failed/);
+  assert.deepEqual(asked.sort(), ['a', 'b']);
+
+  // Same request again: only the part that failed is sent.
+  asked.length = 0;
+  partTwoDown = false;
+  const ok = await generateWindowed(client, 'k', windows, opts('run-1'), async () => {}, () => false);
+  assert.deepEqual(asked, ['b']);
+  assert.ok(ok.text.indexOf('a: d.') < ok.text.indexOf('b: d.'), 'kept part still joins in video order');
+
+  // A different request (another model, level, video...) never borrows them,
+  // and a finished run leaves nothing behind.
+  asked.length = 0;
+  await generateWindowed(client, 'k', windows, opts('run-2'), async () => {}, () => false);
+  assert.deepEqual(asked.sort(), ['a', 'b']);
+  assert.deepEqual(data.FINISHED_PARTS, []);
+});
+
+test('subscription providers split long videos into smaller parts, written together', async () => {
+  const { planWindows } = await load('../scripts/transcript-windows.js');
+  const { PROVIDERS } = await load('../scripts/providers.js');
+  const { generateWindowed } = await load('../background/service-worker.js');
+  const cuesFor = (minutes) => {
+    const lines = [];
+    for (let s = 0; s <= minutes * 60; s += 30) lines.push(`[${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}] words`);
+    return { text: lines.join('\n'), cues: lines.map((_, i) => ({ seconds: i * 30 })) };
+  };
+
+  const ninety = cuesFor(90);
+  const sub = PROVIDERS.claude_subscription.windowing;
+  assert.equal(planWindows(ninety.text, ninety.cues, sub).length, 5, '90 minutes: five parts of 18 minutes');
+  assert.equal(planWindows(ninety.text, ninety.cues, PROVIDERS.gemini.windowing || {}).length, 0, 'an API provider still sends it whole');
+  const twenty = cuesFor(20);
+  assert.equal(planWindows(twenty.text, twenty.cues, sub).length, 0, 'a short video is still one request');
+
+  // All six parts are in flight at once when the provider allows it.
+  let inFlight = 0, peak = 0;
+  const client = {
+    callAPI: async () => {
+      peak = Math.max(peak, ++inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return { text: '[00:01] - T: d.', finishReason: 'stop' };
+    }
+  };
+  const windows = Array.from({ length: 6 }, (_, i) => ({ index: i + 1, count: 6, transcript: String(i), durationMinutes: 20 }));
+  await generateWindowed(client, 'k', windows, { concurrency: sub.concurrency }, async () => {}, () => false);
+  assert.equal(peak, 6);
+  peak = 0;
+  await generateWindowed(client, 'k', windows, {}, async () => {}, () => false);
+  assert.equal(peak, 4, 'everyone else keeps the default of four');
 });

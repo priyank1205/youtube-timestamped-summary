@@ -156,11 +156,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (activeModelId && activeModelId !== 'auto' && configured[activeModelId]) {
-      label.textContent = ALL_PROVIDERS[activeModelId]?.name || activeModelId;
+      label.textContent = ALL_PROVIDERS[activeModelId]?.shortName || ALL_PROVIDERS[activeModelId]?.name || activeModelId;
       return;
     }
     label.textContent = ids.length === 1
-      ? (ALL_PROVIDERS[ids[0]]?.name || ids[0])
+      ? (ALL_PROVIDERS[ids[0]]?.shortName || ALL_PROVIDERS[ids[0]]?.name || ids[0])
       : 'Auto';
   }
 
@@ -169,8 +169,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = escapeHtml(p.name);
     const defaultModel = escapeHtml(savedModel || p.defaultModel);
     const defaultModelLabel = escapeHtml(savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel));
+    // A subscription has no key: a fixed hidden value stands in for one, so the
+    // save, remove and status paths below treat it like any other provider.
+    const keyField = p.isLocal ? `
+      <input type="hidden" id="${id}-api-key" value="connected">
+      <p class="local-note">Uses the ${escapeHtml(p.cli === 'codex' ? 'Codex' : 'Claude Code')} app signed in on this computer. Nothing is billed as API credits.</p>
+    ` : null;
     return `
-      <div class="input-group">
+      ${keyField ?? `<div class="input-group">
         <label for="${id}-api-key">API Key</label>
         <div class="input-wrapper">
           <input type="password" id="${id}-api-key" placeholder="Paste your ${name} API key" autocomplete="off" spellcheck="false">
@@ -179,7 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
           </button>
         </div>
-      </div>
+      </div>`}
       
       <div class="input-group">
         <label for="${id}-model">Model</label>
@@ -193,9 +199,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="key-hint" id="${id}-key-hint" hidden></div>
       <div class="action-row" ${inModal ? 'style="margin-top: 16px;"' : ''}>
         <button class="save-btn" id="save-${id}-key">
-          <span class="btn-content">${SAVE_ICON} Save</span>
+          <span class="btn-content">${SAVE_ICON} ${p.isLocal ? 'Connect' : 'Save'}</span>
         </button>
-        ${!inModal ? `<button class="remove-btn" id="remove-${id}-key" hidden>${p.isCustom ? 'Remove key' : 'Remove'}</button>` : ''}
+        ${!inModal ? `<button class="remove-btn" id="remove-${id}-key" hidden>${p.isCustom ? 'Remove key' : p.isLocal ? 'Disconnect' : 'Remove'}</button>` : ''}
         ${(p.isCustom && !inModal) ? `<button class="remove-btn delete-custom-btn" data-id="${id}">Delete provider</button>` : ''}
       </div>
       
@@ -234,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="model-desc" id="${id}-subline">${escapeHtml(p.description)}</div>
           </div>
           <span class="status-badge not-configured" id="${id}-status">Not set</span>
-          <button class="card-edit" id="${id}-edit" hidden>Replace key</button>
+          <button class="card-edit" id="${id}-edit" hidden>${p.isLocal ? 'Reconnect' : 'Replace key'}</button>
         </div>
         <div class="card-model" id="${id}-modelrow" hidden>
           <span>Model</span>
@@ -1152,8 +1158,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch { /* Chrome refuses to drop a permission it never granted. */ }
   }
 
+  // Subscriptions reach the helper through native messaging, an optional
+  // permission asked for when one is first connected.
+  function requestNativeMessaging() {
+    if (!chrome.permissions?.request) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      chrome.permissions.request({ permissions: ['nativeMessaging'] }, (granted) => {
+        void chrome.runtime.lastError;
+        resolve(!!granted);
+      });
+    });
+  }
+
+  // A connection problem stays on the card in the helper's own words; a toast
+  // would vanish before anyone could act on it.
+  function showLocalProblem(p, message) {
+    if (p.hint) {
+      p.hint.textContent = message;
+      p.hint.hidden = false;
+    }
+    showToast(`Couldn't connect ${p.name}`);
+  }
+
   async function handleSave(p) {
     const key = p.input.value.trim();
+    const saveLabel = p.isLocal ? 'Connect' : 'Save';
+    // Asked before any await, while the click still counts as the user's.
+    if (p.isLocal && !(await requestNativeMessaging())) {
+      showLocalProblem(p, 'The browser needs your permission to talk to the subscription helper. Click Connect and allow it.');
+      return;
+    }
+    // Some browsers only switch the helper connection on for pages opened after
+    // the permission was granted.
+    if (p.isLocal && typeof chrome.runtime.connectNative !== 'function') {
+      showLocalProblem(p, 'Permission granted. Reload this page, then click Connect again.');
+      return;
+    }
     if (!key && !p.isCustom) {
       p.input.focus();
       flashInvalid(p.input);
@@ -1173,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     p.saveBtn.disabled = true;
-    setBtn(p.saveBtn, SPINNER, 'Validating...');
+    setBtn(p.saveBtn, SPINNER, p.isLocal ? 'Connecting...' : 'Validating...');
 
     // Validate against the model this key will actually be used with, and treat
     // the outcomes separately. "The key is rejected", "the key works but that
@@ -1186,13 +1226,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       : await p.client.validateKey(key, p.modelSelect?.value || p.defaultModel);
 
     if (!p.isCustom && result.status !== 'valid' && result.status !== 'model_unavailable') {
+      if (p.isLocal) {
+        // The helper's own words: not installed, signed out, and so on.
+        p.saveBtn.disabled = false;
+        setBtn(p.saveBtn, SAVE_ICON, saveLabel);
+        updateStatus(p.status, false);
+        showLocalProblem(p, result.message || (result.status === 'unreachable'
+          ? 'The subscription helper did not answer.'
+          : `${p.name} is not signed in.`));
+        return;
+      }
       const message = result.status === 'unreachable'
         ? `Couldn't reach ${p.name}. Check your connection and try again.`
         : result.status === 'endpoint'
           ? 'That URL is not a chat-completions endpoint.'
           : 'Invalid API key';
       p.saveBtn.disabled = false;
-      setBtn(p.saveBtn, SAVE_ICON, 'Save');
+      setBtn(p.saveBtn, SAVE_ICON, saveLabel);
       updateStatus(p.status, 'invalid');
       showToast(message);
       flashInvalid(p.input);
@@ -1204,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const updates = { [p.storageKey]: key };
     const stored = await new Promise(resolve => chrome.storage.local.get([`${p.id}_MODEL`], resolve));
-    let savedMessage = `${p.name} key saved`;
+    let savedMessage = p.isLocal ? `${p.name} connected` : `${p.name} key saved`;
 
     if (result.status === 'model_unavailable') {
       // The key works; the model it was checked against does not. Saving the
@@ -1232,7 +1282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setBtn(p.saveBtn, CHECK_ICON, 'Saved');
         setTimeout(() => {
           p.saveBtn.disabled = false;
-          setBtn(p.saveBtn, SAVE_ICON, 'Save');
+          setBtn(p.saveBtn, SAVE_ICON, saveLabel);
         }, 1500);
 
         configured[p.id] = true;
@@ -1255,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       applyKeyState(p, null);
       updateBanner();
       updateModelSelector();
-      showToast(`${p.name} key removed`);
+      showToast(p.isLocal ? `${p.name} disconnected` : `${p.name} key removed`);
       chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
       loadAndRenderProviders();
     });
@@ -1266,7 +1316,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       p.input.value = key || '';
       if (key) p.input.classList.add('secured');
       updateStatus(p.status, true);
-      if (key) {
+      if (p.isLocal) {
+        p.hint.textContent = 'Connected through the helper on this computer';
+      } else if (key) {
         p.hint.textContent = `Saved ••••••••${String(key).slice(-4)}`;
       } else {
         p.hint.textContent = `Saved without key`;
@@ -1277,7 +1329,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // The card's own second line becomes the key, so the tile says what it
       // is connected with while the form stays out of the way.
       if (p.subline) {
-        p.subline.textContent = key
+        p.subline.textContent = p.isLocal
+          ? 'Connected · uses your plan, not API credits'
+          : key
           ? `••••••••${String(key).slice(-4)}`
           : 'No key needed for this endpoint';
         p.subline.classList.add('is-key');
@@ -1374,6 +1428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function resetVisibility(input) {
+    if (!input || input.type === 'hidden') return;
     input.type = 'password';
     const btn = document.querySelector(`.toggle-visibility[data-target="${input.id}"]`);
     if (!btn) return;

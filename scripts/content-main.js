@@ -94,6 +94,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // idle timeout, so a long video summarised in several parts is not cut
         // off partway through for taking longer than one call's worth of time.
         if (typeof noteAnalysisProgress === 'function') noteAnalysisProgress();
+        // A heartbeat from a streaming reply: proof of life, nothing to show.
+        if (request.phase === 'alive') {
+            sendResponse({ success: true });
+            return true;
+        }
         if (typeof updateGenerateButton === 'function') {
             // 'error' carries the classified payload from scripts/errors.js;
             // 'calling_api' may carry a message naming the part in progress.

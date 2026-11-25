@@ -9,6 +9,41 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Added
+
+- **Summaries through your Claude or ChatGPT subscription.** Two new providers,
+  *Claude subscription* and *ChatGPT subscription*, use the plan you already pay
+  for instead of API credits. A small helper on your Mac (`native-host/`) runs
+  the Claude Code or Codex command-line tool you're signed into; the browser
+  starts it when needed, so there is nothing to keep running. Install it once
+  with `bash native-host/install.sh`, then click **Connect** in settings. The
+  extension asks for access to the helper only then, as an optional permission.
+- **Long videos are written in parallel on subscriptions.** These models write
+  more slowly than an API's fast tier, so any video over 25 minutes is split into
+  parts of about 20 minutes and up to six are written at once, instead of one
+  long answer.
+
+### Fixed
+
+- **Gemini thinking models no longer cut summaries off.** Models such as
+  Gemini 4 Hydrogen spend their reasoning out of the same output budget as the
+  summary; they now get room to think on top of it, within the model's own
+  limit.
+- **Gemini replies stream.** A long In-depth summary no longer waits on one
+  silent request, and the panel's progress timer stays alive while text
+  arrives.
+- **Busy models are waited out.** When a provider answers "high demand" (503),
+  the extension now retries after about 5, 12 and 25 seconds, says so in the
+  panel, and does the same for videos short enough to go in one request.
+- **Try again only redoes the parts that failed.** Parts of a long video that
+  finished before another part failed are kept for the session, so a retry
+  sends only what is missing, which matters on free tiers with a daily limit.
+- **Errors carry the provider's own reason.** Copy details now includes what
+  Google said ("This model is currently experiencing high demand…"), so a busy
+  model can be told from a bad request.
+- **The settings sidebar no longer wraps.** A long provider name is shortened
+  with an ellipsis instead of pushing "Your AI" onto two lines.
+
 ## 1.9.1 — 2026-10-07
 
 ### Fixed

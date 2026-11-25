@@ -1997,8 +1997,9 @@
       transition: background .14s ease, color .14s ease, border-color .14s ease;
     }
     .app .nav-item svg { width: 15px; height: 15px; flex: 0 0 auto; opacity: 0.6; fill: none; stroke: currentColor; }
-    .app .nav-label { flex: 1; }
-    .app .nav-val { font-style: normal; font-size: 11px; color: #75757f; font-weight: 400; }
+    .app .nav-label { flex: 1 0 auto; white-space: nowrap; }
+    /* A long value (a provider's name) gives way to the label, never the reverse. */
+    .app .nav-val { font-style: normal; font-size: 11px; color: #75757f; font-weight: 400; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .app .nav-item:hover { color: #d4d4dc; background: rgba(255,255,255,0.03); }
     .app .nav-item.active {
       color: #fff; font-weight: 600;
@@ -2585,6 +2586,7 @@
     #pane-ai .toggle-visibility svg { width: 15px; height: 15px; }
     #pane-ai .key-hint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--bz-faint); margin: -6px 0 13px; }
     #pane-ai .action-row { display: flex; align-items: center; gap: 9px; }
+    .local-note { font-size: 12.5px; line-height: 1.5; color: var(--bz-faint, #71717a); margin: 0 0 14px; }
     #pane-ai .save-btn {
       font: inherit; font-size: 12.5px; font-weight: 650; color: #17100e; cursor: pointer;
       background: linear-gradient(#ef8877, #d9604d); border: 1px solid rgba(255,255,255,0.16);
