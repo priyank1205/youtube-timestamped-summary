@@ -163,12 +163,16 @@ Work through this before calling the work done:
    zip and fails if a file the extension loads is missing. It overwrites
    `dist/<name>-v<version>.zip`, so don't run it casually on a released
    version.
-6. **Changed `native-host/bridge.mjs` or `install.sh`?** Rerun
+6. **New dev-only file or folder at the top level** (docs for contributors,
+   tooling, fixtures)? Add it to `.gitattributes` as `export-ignore`, so it
+   stays out of the "Source code" downloads GitHub attaches to each release.
+   The release zip is separate: it only takes what `tools/package.sh` copies.
+7. **Changed `native-host/bridge.mjs` or `install.sh`?** Rerun
    `bash native-host/install.sh`. The browser runs the installed copy, not the
    repo's.
-7. **Changed the manifest?** Run `npm run test:manifest`, and remind the owner
+8. **Changed the manifest?** Run `npm run test:manifest`, and remind the owner
    to reload the extension in `arc://extensions` and refresh open YouTube tabs.
-8. **Commit only when asked.** Commits end with the co-author line your
+9. **Commit only when asked.** Commits end with the co-author line your
    harness gives you. The owner has asked for direct commits to `main` before;
    ask if unsure.
 
