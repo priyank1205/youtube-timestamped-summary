@@ -114,7 +114,7 @@ const CATEGORIES = {
   },
   [ERROR_CODES.LOCAL_HELPER]: {
     title: "The subscription helper isn't set up",
-    detail: 'Summaries through your Claude or ChatGPT subscription need the helper installed on this computer. Settings explains how.',
+    detail: 'Summaries through your Claude, ChatGPT or Gemini subscription need the helper installed on this computer. Settings explains how.',
     settings: true
   },
   [ERROR_CODES.UNKNOWN]: {

@@ -2,10 +2,10 @@
 // native-host/bridge.mjs
 //
 // The subscription helper. The browser starts it on demand (native messaging)
-// when the extension wants a summary from Claude or ChatGPT, and it answers by
-// running the Claude Code CLI or the Codex CLI that is already installed and
-// signed in on this Mac. Usage counts against those subscriptions, never
-// against API credits.
+// when the extension wants a summary from Claude, ChatGPT or Gemini, and it
+// answers by running the Claude Code, Codex or Antigravity (agy) CLI that is
+// already installed and signed in on this Mac. Usage counts against those
+// subscriptions, never against API credits.
 //
 // Protocol: each message, both ways, is a 4-byte little-endian length followed
 // by that many bytes of UTF-8 JSON. One port carries one request:
@@ -98,6 +98,11 @@ const CODEX_CANDIDATES = [
   '/Applications/Codex.app/Contents/Resources/codex'
 ];
 
+const AGY_CANDIDATES = [
+  '/Applications/Gemini.app/Contents/Helpers/agy',
+  '/Applications/Antigravity.app/Contents/Helpers/agy'
+];
+
 export function binFor(cli) {
   if (cli === 'claude') return process.env.BRIDGE_CLAUDE_BIN || CONFIG.claude || 'claude';
   if (cli === 'codex') {
@@ -105,25 +110,36 @@ export function binFor(cli) {
     if (CONFIG.codex) return CONFIG.codex;
     return CODEX_CANDIDATES.find((candidate) => fs.existsSync(candidate)) || 'codex';
   }
+  if (cli === 'agy') {
+    if (process.env.BRIDGE_AGY_BIN) return process.env.BRIDGE_AGY_BIN;
+    if (CONFIG.agy) return CONFIG.agy;
+    return AGY_CANDIDATES.find((candidate) => fs.existsSync(candidate)) || 'agy';
+  }
   return null;
 }
 
 // Run a short command and collect its output.
 function run(bin, args, { timeoutMs = 15000, env = process.env } = {}) {
   return new Promise((resolve) => {
-    let out = '';
+    let stdout = '';
+    let stderr = '';
     let child;
     try {
       child = spawn(bin, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (err) {
-      resolve({ code: null, out: String(err?.message || err) });
+      const out = String(err?.message || err);
+      resolve({ code: null, out, stdout: '', stderr: out });
       return;
     }
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
-    child.stdout.on('data', (d) => { out += d; });
-    child.stderr.on('data', (d) => { out += d; });
-    child.on('error', (err) => { clearTimeout(timer); resolve({ code: null, out: String(err?.message || err) }); });
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code, out }); });
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      const out = String(err?.message || err);
+      resolve({ code: null, out, stdout, stderr: stderr || out });
+    });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code, out: stdout + stderr, stdout, stderr }); });
   });
 }
 
@@ -133,6 +149,39 @@ const CLAUDE_MODELS = [
   { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
   { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' }
 ];
+
+const AGY_DEFAULT_MODEL = 'gemini-4-hydrogen-low';
+const AGY_MODELS = [
+  { id: 'gemini-4-hydrogen-low', name: 'Gemini 4 Hydrogen' },
+  { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash' }
+];
+
+// `agy models` prints tab-separated `<id>\t<Display Name>` lines to stdout
+// when piped (and column-spaced lines in a terminal).
+export function parseAgyModels(stdout) {
+  const models = [];
+  for (const raw of String(stdout || '').split(/[\r\n]+/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const tab = line.indexOf('\t');
+    if (tab > 0) {
+      const id = line.slice(0, tab).trim();
+      const name = line.slice(tab + 1).trim();
+      if (id) models.push({ id, name: name || id });
+      continue;
+    }
+    const spaced = line.match(/^([a-z0-9][a-z0-9._-]+)\s{2,}(.+)$/i);
+    if (spaced) models.push({ id: spaced[1], name: spaced[2].trim() });
+  }
+  return models;
+}
+
+// Keep only the curated low-effort models and omit effort labels from display names.
+export function filterAgyModels(parsed) {
+  const liveIds = new Set((Array.isArray(parsed) ? parsed : []).map((m) => m?.id).filter(Boolean));
+  const matched = AGY_MODELS.filter((m) => liveIds.has(m.id));
+  return matched.length ? matched : AGY_MODELS;
+}
 
 function codexModels() {
   const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
@@ -171,14 +220,40 @@ export async function status(cli) {
     const { models } = codexModels();
     return { ok: true, models, defaultModel: 'default' };
   }
+  if (cli === 'agy') {
+    const res = await run(bin, ['models'], { timeoutMs: 30000 });
+    if (res.code === null) {
+      return {
+        ok: false,
+        reason: 'not_installed',
+        message: 'The Gemini CLI (agy) was not found. Install the Gemini app or Antigravity CLI, then run install.sh again.'
+      };
+    }
+    if (/please sign in|not logged in|signed out|unauthori[sz]ed|unauthenticat|authenticat/i.test(res.out)) {
+      return {
+        ok: false,
+        reason: 'signed_out',
+        message: 'Gemini is signed out. Open the Gemini app or run `agy` in a terminal to sign in.'
+      };
+    }
+    const parsed = parseAgyModels(res.stdout);
+    if (res.code !== 0 && !parsed.length) {
+      const said = (res.out || `exit ${res.code}`).trim().slice(0, 300);
+      return { ok: false, reason: 'cli_failed', message: `Gemini: ${said}` };
+    }
+    const models = filterAgyModels(parsed);
+    const defaultModel = models[0]?.id || AGY_DEFAULT_MODEL;
+    return { ok: true, models, defaultModel };
+  }
   return { ok: false, reason: 'unknown_cli', message: `Unknown CLI "${cli}".` };
 }
 
 // What a failing CLI said, turned into a code the extension already knows.
 export function classifyFailure(text) {
   const said = String(text || '');
-  if (/usage limit|rate limit|limit reached|too many requests|quota/i.test(said)) return 'rate_limit';
-  if (/not logged in|log ?in|signed out|unauthori[sz]ed|authenticat|401/i.test(said)) return 'auth';
+  if (/usage limit|rate limit|limit reached|too many requests|quota|exhausted|resource_exhausted/i.test(said)) return 'rate_limit';
+  if (/not logged in|log ?in|please sign in|sign ?in|signed out|unauthori[sz]ed|unauthenticat|authenticat|401/i.test(said)) return 'auth';
+  if (/invalid model|not recognized as a known model|model.*not found/i.test(said)) return 'model_unavailable';
   if (/overloaded|529|503|unavailable/i.test(said)) return 'provider_down';
   return 'cli_failed';
 }
@@ -225,6 +300,20 @@ export function generate({ cli, model, prompt, effort }, emit) {
       ...(model && model !== 'default' ? ['-m', model] : [])
     ];
     input = `${SYSTEM_PROMPT}\n\n${prompt}`;
+  } else if (cli === 'agy') {
+    // Pass the prompt over stdin as stream-json so long transcripts avoid
+    // command-line length limits; --sandbox and --disable-slash-commands keep
+    // the run isolated from local files and workspace commands.
+    args = [
+      '--output-format', 'stream-json',
+      '--input-format', 'stream-json',
+      '--disable-slash-commands',
+      '--sandbox',
+      ...(effort ? ['--effort', effort] : []),
+      ...(model && model !== 'default' ? ['--model', model] : []),
+      '-p', ''
+    ];
+    input = `${JSON.stringify({ event: 'user', message: { content: `${SYSTEM_PROMPT}\n\n${prompt}` } })}\n`;
   } else {
     emit({ type: 'error', code: 'cli_failed', message: `Unknown CLI "${cli}".` });
     return () => {};
@@ -280,9 +369,27 @@ export function generate({ cli, model, prompt, effort }, emit) {
     }
   };
 
+  const onAgyEvent = (event) => {
+    if (event?.event === 'step_update') {
+      const su = event.step_update;
+      if (su?.step_type === 'agent_response' && typeof su.text_delta === 'string' && su.text_delta) {
+        text += su.text_delta;
+        emit({ type: 'delta', text: su.text_delta });
+      } else {
+        emit({ type: 'activity' });
+      }
+    } else if (event?.event === 'init') {
+      emit({ type: 'activity' });
+    } else if (event?.event === 'result') {
+      finalResult = event.result || event;
+    }
+  };
+
+  const onJsonEvent = cli === 'claude' ? onClaudeEvent : cli === 'agy' ? onAgyEvent : null;
+
   child.stdout.on('data', (chunk) => {
     lastOutput = Date.now();
-    if (cli === 'codex') {
+    if (!onJsonEvent) {
       // Codex reports its steps as JSON events; the answer itself arrives in
       // the output file at the end. The events are proof of life.
       emit({ type: 'activity' });
@@ -293,7 +400,7 @@ export function generate({ cli, model, prompt, effort }, emit) {
     stdoutRest = lines.pop();
     for (const line of lines) {
       if (!line.trim()) continue;
-      try { onClaudeEvent(JSON.parse(line)); } catch { /* not an event */ }
+      try { onJsonEvent(JSON.parse(line)); } catch { /* not an event */ }
     }
   });
   child.stderr.on('data', (chunk) => {
@@ -304,8 +411,10 @@ export function generate({ cli, model, prompt, effort }, emit) {
     finish({ type: 'error', code: 'not_installed', message: `Could not start ${bin}: ${err?.message || err}` });
   });
   child.on('close', (code) => {
+    if (onJsonEvent && stdoutRest.trim()) {
+      try { onJsonEvent(JSON.parse(stdoutRest)); } catch { /* partial */ }
+    }
     if (cli === 'claude') {
-      if (stdoutRest.trim()) { try { onClaudeEvent(JSON.parse(stdoutRest)); } catch { /* partial */ } }
       if (finalResult?.is_error || (!finalResult && code !== 0)) {
         const said = String(finalResult?.result || stderr || `exit ${code}`).slice(0, 500);
         finish({ type: 'error', code: classifyFailure(said), message: `Claude: ${said}` });
@@ -314,6 +423,20 @@ export function generate({ cli, model, prompt, effort }, emit) {
       // Without partial messages (an older CLI) the reply is only in the result.
       const reply = text || String(finalResult?.result || '');
       finish({ type: 'done', text: reply, finishReason: finalResult?.stop_reason || null });
+      return;
+    }
+    if (cli === 'agy') {
+      if (finalResult?.status === 'ERROR' || (!finalResult && code !== 0) || (code !== 0 && !text && !finalResult?.response)) {
+        const said = String(finalResult?.error || stderr || `exit ${code}`).slice(0, 500);
+        finish({ type: 'error', code: classifyFailure(said), message: `Gemini: ${said}` });
+        return;
+      }
+      const reply = text || String(finalResult?.response || '');
+      finish({
+        type: 'done',
+        text: reply,
+        finishReason: finalResult?.finished_reason || finalResult?.finish_reason || null
+      });
       return;
     }
     const reply = outFile && fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8') : '';

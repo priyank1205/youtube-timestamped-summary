@@ -5,6 +5,7 @@ audit/
 
 # Editor/agent workspace config: holds absolute paths from one machine
 .claude/
+.antigravitycli/
 
 # Build output and tooling
 dist/

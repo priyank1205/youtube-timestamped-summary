@@ -1,5 +1,5 @@
-// Summaries through a Claude or ChatGPT subscription: the native helper that
-// runs the CLIs, and the extension client that talks to it.
+// Summaries through a Claude, ChatGPT or Gemini subscription: the native helper
+// that runs the CLIs, and the extension client that talks to it.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,12 +10,19 @@ const path = require('node:path');
 const load = (rel) => import(path.join(__dirname, rel));
 
 // A stand-in CLI: prints the given lines to stdout, then exits with `code`.
-function fakeCli(lines, code = 0, stderr = '') {
+// When `capturePath` is provided, writes argv and stdin JSON for assertions.
+function fakeCli(lines, code = 0, stderr = '', capturePath = null) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-cli-'));
   const bin = path.join(dir, 'cli');
   fs.writeFileSync(bin, `#!${process.execPath}
-process.stdin.resume();
+const fs = require('node:fs');
+let stdin = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (c) => { stdin += c; });
 process.stdin.on('end', () => {
+  if (${JSON.stringify(capturePath)}) {
+    fs.writeFileSync(${JSON.stringify(capturePath)}, JSON.stringify({ argv: process.argv.slice(2), stdin }));
+  }
   for (const line of ${JSON.stringify(lines)}) process.stdout.write(line + '\\n');
   if (${JSON.stringify(stderr)}) process.stderr.write(${JSON.stringify(stderr)});
   process.exit(${code});
@@ -198,9 +205,145 @@ test('cancelling a subscription summary closes the port, which stops the CLI', a
 });
 
 test('subscription providers count as configured once connected', async () => {
-  const { PROVIDERS, configuredProviders } = await load('../scripts/providers.js');
+  const { PROVIDERS, configuredProviders, modelLabel } = await load('../scripts/providers.js');
   assert.equal(PROVIDERS.claude_subscription.cli, 'claude');
   assert.equal(PROVIDERS.chatgpt_subscription.cli, 'codex');
-  const ids = configuredProviders({ CLAUDE_SUBSCRIPTION: 'connected' }).map((p) => p.id);
-  assert.deepEqual(ids, ['claude_subscription']);
+  assert.equal(PROVIDERS.gemini_subscription.cli, 'agy');
+  assert.equal(PROVIDERS.gemini_subscription.defaultModel, 'gemini-4-hydrogen-low');
+  assert.equal(PROVIDERS.gemini_subscription.defaultModelName, 'Gemini 4 Hydrogen');
+  assert.equal(modelLabel(PROVIDERS.gemini_subscription, 'gemini-4-hydrogen-low'), '4 Hydrogen');
+  assert.equal(modelLabel(PROVIDERS.gemini_subscription, 'gemini-3.8-flash-low'), '3.8 Flash');
+  const ids = configuredProviders({
+    CLAUDE_SUBSCRIPTION: 'connected',
+    GEMINI_SUBSCRIPTION: 'connected'
+  }).map((p) => p.id);
+  assert.deepEqual(ids, ['claude_subscription', 'gemini_subscription']);
+});
+
+test('the helper lists only curated low-effort models without effort labels for agy', async () => {
+  const bridge = await load('../native-host/bridge.mjs');
+
+  assert.deepEqual(bridge.parseAgyModels(
+    'gemini-4-hydrogen-high\tGemini 4 Hydrogen (High)\n' +
+    'gemini-4-hydrogen-xhigh\tGemini 4 Hydrogen (XHigh)\n' +
+    'gemini-3.8-flash-low  Gemini 3.8 Flash (Low)\n'
+  ), [
+    { id: 'gemini-4-hydrogen-high', name: 'Gemini 4 Hydrogen (High)' },
+    { id: 'gemini-4-hydrogen-xhigh', name: 'Gemini 4 Hydrogen (XHigh)' },
+    { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash (Low)' }
+  ]);
+
+  process.env.BRIDGE_AGY_BIN = fakeCli([
+    'gemini-4-hydrogen-high\tGemini 4 Hydrogen (High)',
+    'gemini-4-hydrogen-xhigh\tGemini 4 Hydrogen (XHigh)',
+    'gemini-4-hydrogen-medium\tGemini 4 Hydrogen (Medium)',
+    'gemini-4-hydrogen-low\tGemini 4 Hydrogen (Low)',
+    'gemini-3.8-flash-high\tGemini 3.8 Flash (High)',
+    'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)',
+    'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
+    'gpt-oss-120b-medium\tGPT-OSS 120B (Medium)'
+  ], 0, 'Fetching available models...\n');
+  try {
+    const res = await bridge.status('agy');
+    assert.equal(res.ok, true);
+    assert.equal(res.defaultModel, 'gemini-4-hydrogen-low');
+    assert.deepEqual(res.models, [
+      { id: 'gemini-4-hydrogen-low', name: 'Gemini 4 Hydrogen' },
+      { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash' }
+    ]);
+  } finally {
+    delete process.env.BRIDGE_AGY_BIN;
+  }
+
+  process.env.BRIDGE_AGY_BIN = fakeCli(
+    [],
+    1,
+    'Error: Please sign in to view available models. Launch the CLI without arguments to sign in.\n'
+  );
+  try {
+    const res = await bridge.status('agy');
+    assert.equal(res.ok, false);
+    assert.equal(res.reason, 'signed_out');
+  } finally {
+    delete process.env.BRIDGE_AGY_BIN;
+  }
+
+  process.env.BRIDGE_AGY_BIN = path.join(os.tmpdir(), 'no-such-agy-here');
+  try {
+    const res = await bridge.status('agy');
+    assert.equal(res.ok, false);
+    assert.equal(res.reason, 'not_installed');
+  } finally {
+    delete process.env.BRIDGE_AGY_BIN;
+  }
+});
+
+test('the helper streams agy replies, skips non-response steps, and classifies agy errors', async () => {
+  const bridge = await load('../native-host/bridge.mjs');
+  const capturePath = path.join(os.tmpdir(), `agy-capture-${process.pid}.json`);
+
+  process.env.BRIDGE_AGY_BIN = fakeCli([
+    JSON.stringify({ event: 'init', conversation_id: 'c1', init: { model: 'gemini-4-hydrogen-xhigh' } }),
+    JSON.stringify({ event: 'step_update', step_update: { step_index: 0, state: 'DONE', step_type: 'user_input' } }),
+    JSON.stringify({ event: 'step_update', step_update: { step_index: 1, state: 'ACTIVE', step_type: 'thought', text_delta: 'internal thought ' } }),
+    JSON.stringify({ event: 'step_update', step_update: { step_index: 2, state: 'ACTIVE', step_type: 'agent_response', text_delta: '[00:00] - A: ' } }),
+    JSON.stringify({ event: 'step_update', step_update: { step_index: 2, state: 'DONE', step_type: 'agent_response', text_delta: 'b.' } }),
+    JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response: '[00:00] - A: b.' } })
+  ], 0, '', capturePath);
+  try {
+    const seen = await runGenerate(bridge, { cli: 'agy', model: 'gemini-4-hydrogen-xhigh', prompt: 'Summarize transcript' });
+    assert.deepEqual(seen.filter((m) => m.type === 'delta').map((m) => m.text), ['[00:00] - A: ', 'b.']);
+    assert.ok(seen.some((m) => m.type === 'activity'));
+    assert.deepEqual(seen.at(-1), { type: 'done', text: '[00:00] - A: b.', finishReason: null });
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+    assert.ok(captured.argv.includes('--output-format'));
+    assert.ok(captured.argv.includes('stream-json'));
+    assert.ok(captured.argv.includes('--input-format'));
+    assert.ok(captured.argv.includes('--sandbox'));
+    assert.ok(captured.argv.includes('--disable-slash-commands'));
+    assert.ok(captured.argv.includes('--model'));
+    assert.ok(captured.argv.includes('gemini-4-hydrogen-xhigh'));
+    const stdinEvent = JSON.parse(captured.stdin.trim());
+    assert.equal(stdinEvent.event, 'user');
+    assert.match(stdinEvent.message.content, /Summarize transcript$/);
+  } finally {
+    delete process.env.BRIDGE_AGY_BIN;
+    fs.rmSync(capturePath, { force: true });
+  }
+
+  process.env.BRIDGE_AGY_BIN = fakeCli([
+    JSON.stringify({
+      event: 'result',
+      result: {
+        status: 'ERROR',
+        response: '',
+        error: 'invalid model selection (--model "bad-model"): model bad-model is not recognized as a known model',
+        finished_reason: 'error'
+      }
+    })
+  ], 1);
+  try {
+    const seen = await runGenerate(bridge, { cli: 'agy', model: 'bad-model', prompt: 'p' });
+    assert.equal(seen.at(-1).type, 'error');
+    assert.equal(seen.at(-1).code, 'model_unavailable');
+  } finally {
+    delete process.env.BRIDGE_AGY_BIN;
+  }
+
+  assert.equal(bridge.classifyFailure('Error: Please sign in to view available models.'), 'auth');
+  assert.equal(bridge.classifyFailure('RESOURCE_EXHAUSTED: quota exceeded'), 'rate_limit');
+});
+
+test('the subscription client maps model_unavailable errors from the helper', async () => {
+  const { SubscriptionClient } = await load('../scripts/subscription-client.js');
+  const { restore } = withNativePort((msg, port) => {
+    port.send({ type: 'error', code: 'model_unavailable', message: 'Gemini: invalid model selection' });
+  });
+  try {
+    const client = new SubscriptionClient({ cli: 'agy', defaultModel: 'gemini-4-hydrogen-low' });
+    await assert.rejects(client.callAPI('connected', 't', {}), (err) => err.code === 'model_unavailable');
+  } finally {
+    restore();
+  }
 });

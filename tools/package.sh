@@ -28,8 +28,8 @@ mkdir -p "$STAGE"
 # the check below fails the build if one is forgotten.
 cp manifest.json LICENSE "$STAGE/"
 cp -R background scripts options popup styles icons "$STAGE/"
-# Not loaded by the extension: the optional helper for Claude and ChatGPT
-# subscriptions, installed from the unzipped folder (native-host/install.sh).
+# Not loaded by the extension: the optional helper for Claude, ChatGPT and
+# Gemini subscriptions, installed from the unzipped folder (native-host/install.sh).
 cp -R native-host "$STAGE/"
 
 find "$STAGE" -name '.DS_Store' -delete

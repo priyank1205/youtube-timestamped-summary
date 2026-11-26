@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Install the subscription helper on this Mac, so the extension can summarise
-# with your Claude and ChatGPT subscriptions instead of API credits.
+# with your Claude, ChatGPT and Gemini subscriptions instead of API credits.
 #
 # It copies bridge.mjs to ~/Library/Application Support/TimestampedSummary,
-# records where node, claude and codex live (the browser starts the helper with
-# a bare PATH that finds none of them), and registers the helper with every
+# records where node, claude, codex and agy live (the browser starts the helper
+# with a bare PATH that finds none of them), and registers the helper with every
 # Chromium browser found here: Arc, Chrome, Chromium, Brave, Edge, Aside.
 #
 #   bash native-host/install.sh [extension-id ...]   install (or update)
@@ -64,6 +64,16 @@ if [[ -z "$CODEX_BIN" ]]; then
     if [[ -x "$candidate" ]]; then CODEX_BIN="$candidate"; break; fi
   done
 fi
+# Prefer the app-bundled agy binary when present so a stale ~/.local/bin/agy
+# left from an older CLI install does not shadow Gemini.app updates.
+AGY_BIN=""
+for candidate in "/Applications/Gemini.app/Contents/Helpers/agy" \
+                 "/Applications/Antigravity.app/Contents/Helpers/agy"; do
+  if [[ -x "$candidate" ]]; then AGY_BIN="$candidate"; break; fi
+done
+if [[ -z "$AGY_BIN" ]]; then
+  AGY_BIN="$(resolve agy)"
+fi
 
 if [[ -z "$NODE_BIN" ]]; then
   echo "Node.js was not found. Install it (18 or newer), then run this again." >&2
@@ -73,10 +83,11 @@ fi
 mkdir -p "$APP_DIR"
 cp "$HERE/bridge.mjs" "$APP_DIR/bridge.mjs"
 
-NODE_BIN="$NODE_BIN" CLAUDE_BIN="$CLAUDE_BIN" CODEX_BIN="$CODEX_BIN" "$NODE_BIN" -e '
+NODE_BIN="$NODE_BIN" CLAUDE_BIN="$CLAUDE_BIN" CODEX_BIN="$CODEX_BIN" AGY_BIN="$AGY_BIN" "$NODE_BIN" -e '
   const config = {};
   if (process.env.CLAUDE_BIN) config.claude = process.env.CLAUDE_BIN;
   if (process.env.CODEX_BIN) config.codex = process.env.CODEX_BIN;
+  if (process.env.AGY_BIN) config.agy = process.env.AGY_BIN;
   process.stdout.write(JSON.stringify(config, null, 2) + "\n");
 ' > "$APP_DIR/bridge-config.json"
 
@@ -103,7 +114,7 @@ done
 
 MANIFEST="{
   \"name\": \"$HOST_NAME\",
-  \"description\": \"Timestamped Summary for YouTube: summaries through your Claude and ChatGPT subscriptions\",
+  \"description\": \"Timestamped Summary for YouTube: summaries through your Claude, ChatGPT and Gemini subscriptions\",
   \"path\": \"$APP_DIR/run-bridge.sh\",
   \"type\": \"stdio\",
   \"allowed_origins\": [ $ORIGINS ]
@@ -122,6 +133,7 @@ echo "Installed the subscription helper."
 echo "  node:   $NODE_BIN"
 echo "  claude: ${CLAUDE_BIN:-not found}"
 echo "  codex:  ${CODEX_BIN:-not found}"
+echo "  agy:    ${AGY_BIN:-not found}"
 echo "  allowed extension ids: ${IDS[*]}"
 echo "  registered with: ${REGISTERED[*]:-no browsers found}"
-echo "Now open the extension's settings and connect Claude or ChatGPT (subscription)."
+echo "Now open the extension's settings and connect Claude, ChatGPT or Gemini (subscription)."

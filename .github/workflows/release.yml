@@ -65,7 +65,7 @@ jobs:
 
           Then open the extension's settings and paste an API key for one provider
           (Gemini, OpenAI, Anthropic, or your own OpenAI-compatible endpoint).
-          On a Mac you can use your Claude or ChatGPT subscription instead: run
+          On a Mac you can use your Claude, ChatGPT or Gemini subscription instead: run
           `bash native-host/install.sh` from the unzipped folder, then connect it
           in settings.
 

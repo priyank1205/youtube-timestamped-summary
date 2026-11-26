@@ -4,6 +4,13 @@ import { OpenAICompatibleClient } from './openai-compatible-client.js';
 import { AnthropicClient } from './anthropic-client.js';
 import { SubscriptionClient } from './subscription-client.js';
 
+// Subscription CLIs write more slowly than an API's fast tier, and a summary
+// takes as long as its longest single stream. Smaller parts written in
+// parallel finish in a fraction of the time one long answer takes; plan limits
+// are rolling across hours rather than tight per-minute RPM, so ten at once
+// keeps 3+ hour videos in a single wave.
+const SUBSCRIPTION_WINDOWING = { targetMinutes: 20, thresholdMinutes: 25, concurrency: 10 };
+
 /**
  * Central registry of supported LLM providers.
  * 
@@ -81,9 +88,9 @@ export const PROVIDERS = {
       'Copy the key and paste it here'
     ]
   },
-  // Subscriptions, not API keys: these run the Claude Code and Codex CLIs
-  // signed in on this computer, through the helper in native-host/. The stored
-  // value is only a marker that the user connected it.
+  // Subscriptions, not API keys: these run the Claude Code, Codex and
+  // Antigravity (agy) CLIs signed in on this computer, through the helper in
+  // native-host/. The stored value is only a marker that the user connected it.
   claude_subscription: {
     id: 'claude_subscription',
     name: 'Claude subscription',
@@ -91,11 +98,8 @@ export const PROVIDERS = {
     description: 'Your Claude plan, through Claude Code on this computer',
     clientClass: SubscriptionClient,
     cli: 'claude',
-    // These models write several times slower than an API's fast tier, and a
-    // summary takes as long as its longest single stream. Smaller parts, all
-    // written at once, finish in a fraction of the time one long answer takes.
-    // A plan's limits are per few hours, not per minute, so six at once is fine.
-    windowing: { targetMinutes: 20, thresholdMinutes: 25, concurrency: 6 },
+    localAppName: 'Claude Code',
+    windowing: SUBSCRIPTION_WINDOWING,
     isLocal: true,
     storageKey: 'CLAUDE_SUBSCRIPTION',
     defaultModel: 'claude-sonnet-5-5',
@@ -117,11 +121,8 @@ export const PROVIDERS = {
     description: 'Your ChatGPT plan, through Codex on this computer',
     clientClass: SubscriptionClient,
     cli: 'codex',
-    // These models write several times slower than an API's fast tier, and a
-    // summary takes as long as its longest single stream. Smaller parts, all
-    // written at once, finish in a fraction of the time one long answer takes.
-    // A plan's limits are per few hours, not per minute, so six at once is fine.
-    windowing: { targetMinutes: 20, thresholdMinutes: 25, concurrency: 6 },
+    localAppName: 'Codex',
+    windowing: SUBSCRIPTION_WINDOWING,
     isLocal: true,
     storageKey: 'CHATGPT_SUBSCRIPTION',
     defaultModel: 'default',
@@ -135,6 +136,34 @@ export const PROVIDERS = {
       'Click <strong>Connect</strong> above, and allow the browser to talk to the helper when it asks.'
     ],
     helpNote: 'Summaries count against your ChatGPT plan\'s usage limits, not API credits.'
+  },
+  gemini_subscription: {
+    id: 'gemini_subscription',
+    name: 'Gemini subscription',
+    shortName: 'Gemini plan',
+    description: 'Your Google AI plan, through the Gemini app on this computer',
+    clientClass: SubscriptionClient,
+    cli: 'agy',
+    localAppName: 'Gemini',
+    windowing: SUBSCRIPTION_WINDOWING,
+    isLocal: true,
+    storageKey: 'GEMINI_SUBSCRIPTION',
+    defaultModel: 'gemini-4-hydrogen-low',
+    defaultModelName: 'Gemini 4 Hydrogen',
+    modelNames: {
+      'gemini-4-hydrogen-low': 'Gemini 4 Hydrogen',
+      'gemini-3.8-flash-low': 'Gemini 3.8 Flash'
+    },
+    preferredModels: ['gemini-3.8-flash-low'],
+    svgIcon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg>`,
+    cssClass: 'gemini',
+    helpTitle: 'How to connect your Gemini subscription',
+    helpSteps: [
+      'Install the <strong>Gemini</strong> app (or the <code>agy</code> CLI) and sign in with your Google account.',
+      'In this extension\'s folder, run <code>bash native-host/install.sh</code> once.',
+      'Click <strong>Connect</strong> above, and allow the browser to talk to the helper when it asks.'
+    ],
+    helpNote: 'Summaries count against your Google AI plan\'s usage limits, not API credits.'
   }
 };
 
@@ -183,7 +212,8 @@ export const RETIRED_MODEL_PATTERNS = {
     /^gpt-5(-mini|-nano|-pro)?-20\d{2}-\d{2}-\d{2}$/i,
     /^gpt-5(\.\d)?-chat-latest$/i,
     /^o[134](-mini|-preview)?-20\d{2}-\d{2}-\d{2}$/i
-  ]
+  ],
+  gemini_subscription: [/^(?!gemini-(?:4-hydrogen|3\.8-flash)-low$).+/i]
 };
 
 // Providers that used to be built in, and the settings they leave behind.
@@ -254,7 +284,8 @@ export function pickModel(ids, provider) {
 export function modelLabel(provider, modelId) {
   if (!provider) return String(modelId || '');
   const id = modelId || provider.defaultModel || '';
-  let label = (id && id === provider.defaultModel && provider.defaultModelName) || id;
+  const named = provider.modelNames?.[id] || (id && id === provider.defaultModel && provider.defaultModelName);
+  let label = named || id;
   const firstWord = String(label).split(' ')[0];
   if (String(label).includes(' ') && String(provider.name || '').toLowerCase().includes(firstWord.toLowerCase())) {
     label = String(label).slice(firstWord.length).trim();

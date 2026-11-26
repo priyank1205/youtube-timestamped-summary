@@ -1,6 +1,6 @@
 // options/options.js
 
-import { PROVIDERS, normalizeEndpoint, endpointOrigin, detectKeyProvider, modelLabel, configuredProviders, pickModel } from '../scripts/providers.js';
+import { PROVIDERS, normalizeEndpoint, endpointOrigin, detectKeyProvider, modelLabel, configuredProviders, pickModel, isRetiredModel } from '../scripts/providers.js';
 import { densityFor } from '../scripts/constants.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 
@@ -164,16 +164,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       : 'Auto';
   }
 
+  function displayModelName(p, modelId) {
+    return p.modelNames?.[modelId]
+      || (modelId === p.defaultModel ? (p.defaultModelName || modelId) : modelId);
+  }
+
   function getProviderFormHTML(p, inModal = false, savedModel = null) {
     const id = escapeHtml(p.id);
     const name = escapeHtml(p.name);
-    const defaultModel = escapeHtml(savedModel || p.defaultModel);
-    const defaultModelLabel = escapeHtml(savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel));
+    const initialModel = savedModel || p.defaultModel;
+    const defaultModel = escapeHtml(initialModel);
+    const defaultModelLabel = escapeHtml(displayModelName(p, initialModel));
     // A subscription has no key: a fixed hidden value stands in for one, so the
     // save, remove and status paths below treat it like any other provider.
     const keyField = p.isLocal ? `
       <input type="hidden" id="${id}-api-key" value="connected">
-      <p class="local-note">Uses the ${escapeHtml(p.cli === 'codex' ? 'Codex' : 'Claude Code')} app signed in on this computer. Nothing is billed as API credits.</p>
+      <p class="local-note">Uses the ${escapeHtml(p.localAppName || p.cli || 'local')} app signed in on this computer. Nothing is billed as API credits.</p>
     ` : null;
     return `
       ${keyField ?? `<div class="input-group">
@@ -344,7 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // The config view holds two different things: a built-in provider's key
   // form, and the custom-endpoint sheet. They do not look alike, so the view
   // says which one it is showing rather than styling both the same.
-  function setConfigMode(custom) {
+  function setConfigMode(custom, local = false) {
     providerConfigView.classList.toggle('cp-mode', custom);
     const icon = document.getElementById('provider-config-icon');
     const sub = document.getElementById('provider-config-subtitle');
@@ -352,12 +358,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (sub) {
       sub.textContent = custom
         ? 'Point it at any OpenAI-compatible endpoint'
-        : 'Enter API details below';
+        : local
+          ? 'Connect through the helper on this computer'
+          : 'Enter API details below';
     }
   }
 
   function openProviderConfig(p) {
-    setConfigMode(false);
+    setConfigMode(false, !!p.isLocal);
     providerConfigTitle.textContent = p.name;
     providerConfigBody.innerHTML = getProviderFormHTML(p, true);
     
@@ -410,6 +418,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cacheKey = `${p.id}_CACHED_MODELS`;
     chrome.storage.local.get([cacheKey], async (res) => {
       let cachedModels = res[cacheKey] || [];
+      if (cachedModels.some((m) => isRetiredModel(p.id, m?.id) || (p.modelNames?.[m?.id] && m?.name !== p.modelNames[m.id]))) {
+        cachedModels = [];
+      }
       
       // If we have no cache and it's custom with a fallback list
       if (cachedModels.length === 0 && p.isCustom && p.modelsList) {
@@ -419,8 +430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Render cached models immediately
       if (cachedModels.length === 0) {
         const initialVal = savedModel || p.defaultModel;
-        const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
-        setSingleOption(p.modelSelect, initialVal, initialLabel);
+        setSingleOption(p.modelSelect, initialVal, displayModelName(p, initialVal));
       } else {
         renderSelectOptions(p, cachedModels, savedModel);
       }
@@ -438,8 +448,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const restoreDefault = () => {
           if (cachedModels.length > 0) return;   // the cache is still on screen
           const initialVal = savedModel || p.defaultModel;
-          const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
-          setSingleOption(p.modelSelect, initialVal, initialLabel);
+          setSingleOption(p.modelSelect, initialVal, displayModelName(p, initialVal));
           p.modelSelect.disabled = false;
     mirrorModelOptions(p);
         };

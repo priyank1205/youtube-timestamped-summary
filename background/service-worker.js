@@ -66,17 +66,28 @@ refreshActionBadge();
 // is the user's own to maintain.
 async function migrateRetiredModels() {
   try {
-    const keys = Object.keys(PROVIDERS).map((id) => `${id}_MODEL`);
+    const ids = Object.keys(PROVIDERS);
+    const keys = ids.flatMap((id) => [`${id}_MODEL`, `${id}_CACHED_MODELS`]);
     const stored = await chrome.storage.local.get(keys);
     const updates = {};
-    for (const id of Object.keys(PROVIDERS)) {
+    const dropCaches = [];
+    for (const id of ids) {
       const saved = stored[`${id}_MODEL`];
-      if (saved && isRetiredModel(id, saved)) {
+      const retired = saved && isRetiredModel(id, saved);
+      if (retired) {
         updates[`${id}_MODEL`] = PROVIDERS[id].defaultModel;
         console.log(`Migrating retired ${id} model ${saved} -> ${PROVIDERS[id].defaultModel}`);
       }
+      const cached = stored[`${id}_CACHED_MODELS`];
+      const modelNames = PROVIDERS[id].modelNames;
+      const staleCache = Array.isArray(cached) && cached.some((m) =>
+        isRetiredModel(id, m?.id) || (modelNames?.[m?.id] && m?.name !== modelNames[m.id]));
+      if ((retired && `${id}_CACHED_MODELS` in stored) || staleCache) {
+        dropCaches.push(`${id}_CACHED_MODELS`);
+      }
     }
     if (Object.keys(updates).length) await chrome.storage.local.set(updates);
+    if (dropCaches.length) await chrome.storage.local.remove(dropCaches);
   } catch (err) {
     console.warn('Model migration failed:', err.message);
   }

@@ -1,11 +1,11 @@
 // scripts/subscription-client.js
 //
-// Summaries through the user's Claude or ChatGPT subscription. The extension
-// cannot run programs, so it asks the subscription helper (native-host/) over
-// native messaging; the helper runs the Claude Code CLI or the Codex CLI that
-// is signed in on this Mac. Usage counts against the subscription, not API
-// credits. There is no key: the provider's stored value only records that the
-// user connected it.
+// Summaries through the user's Claude, ChatGPT or Gemini subscription. The
+// extension cannot run programs, so it asks the subscription helper
+// (native-host/) over native messaging; the helper runs the Claude Code,
+// Codex or Antigravity (agy) CLI that is signed in on this Mac. Usage counts
+// against the subscription, not API credits. There is no key: the provider's
+// stored value only records that the user connected it.
 
 import { LLMClient } from './llm-client.js';
 import { composeSummaryPrompt } from './constants.js';
@@ -18,6 +18,7 @@ const CODE_MAP = {
   rate_limit: ERROR_CODES.RATE_LIMIT,
   auth: ERROR_CODES.AUTH,
   signed_out: ERROR_CODES.AUTH,
+  model_unavailable: ERROR_CODES.MODEL_UNAVAILABLE,
   provider_down: ERROR_CODES.PROVIDER_DOWN,
   timeout: ERROR_CODES.TIMEOUT,
   not_installed: ERROR_CODES.LOCAL_HELPER,

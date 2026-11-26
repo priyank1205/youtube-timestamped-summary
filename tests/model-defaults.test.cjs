@@ -167,6 +167,11 @@ test('retired ids are recognised and current ones are left alone', async () => {
       'gpt-4-0613', 'gpt-4-32k', 'gpt-4-vision-preview', 'gpt-4o-2024-05-13',
       'gpt-5-2025-08-07', 'gpt-5-mini-2025-08-07', 'gpt-5-nano-2025-08-07',
       'gpt-5-chat-latest', 'gpt-5.2-chat-latest', 'o3-2025-04-16', 'o4-mini-2025-04-16'
+    ],
+    gemini_subscription: [
+      'gemini-4-hydrogen-medium', 'gemini-4-hydrogen-high', 'gemini-4-hydrogen-xhigh',
+      'gemini-3.8-flash-medium', 'gemini-3.8-flash-high',
+      'claude-sonnet-4-6', 'gpt-oss-120b-medium'
     ]
   };
   const current = {
@@ -179,6 +184,9 @@ test('retired ids are recognised and current ones are left alone', async () => {
     openai: [
       'gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-5.6-luna',
       'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra'
+    ],
+    gemini_subscription: [
+      'gemini-4-hydrogen-low', 'gemini-3.8-flash-low'
     ]
   };
 

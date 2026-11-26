@@ -252,7 +252,10 @@ test('subscription providers split long videos into smaller parts, written toget
   const twenty = cuesFor(20);
   assert.equal(planWindows(twenty.text, twenty.cues, sub).length, 0, 'a short video is still one request');
 
-  // All six parts are in flight at once when the provider allows it.
+  // All ten parts are in flight at once when the provider allows it.
+  for (const id of ['claude_subscription', 'chatgpt_subscription', 'gemini_subscription']) {
+    assert.equal(PROVIDERS[id].windowing.concurrency, 10);
+  }
   let inFlight = 0, peak = 0;
   const client = {
     callAPI: async () => {
@@ -262,9 +265,9 @@ test('subscription providers split long videos into smaller parts, written toget
       return { text: '[00:01] - T: d.', finishReason: 'stop' };
     }
   };
-  const windows = Array.from({ length: 6 }, (_, i) => ({ index: i + 1, count: 6, transcript: String(i), durationMinutes: 20 }));
+  const windows = Array.from({ length: 10 }, (_, i) => ({ index: i + 1, count: 10, transcript: String(i), durationMinutes: 20 }));
   await generateWindowed(client, 'k', windows, { concurrency: sub.concurrency }, async () => {}, () => false);
-  assert.equal(peak, 6);
+  assert.equal(peak, 10);
   peak = 0;
   await generateWindowed(client, 'k', windows, {}, async () => {}, () => false);
   assert.equal(peak, 4, 'everyone else keeps the default of four');

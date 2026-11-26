@@ -242,19 +242,19 @@ The extension does not include an AI model. You point it at a provider you have 
 
 <p align="center"><sup>Two providers configured, with <strong>Auto</strong> falling back between them.</sup></p>
 
-#### Or use your Claude or ChatGPT subscription (Mac)
+#### Or use your Claude, ChatGPT or Gemini subscription (Mac)
 
-If you pay for Claude or ChatGPT, summaries can come out of that plan instead of API credits. The extension can't run programs itself, so a small helper does it: the browser starts it when needed, and it runs the **Claude Code** or **Codex** command-line tool you're already signed into.
+If you pay for Claude, ChatGPT or Google AI (Gemini), summaries can come out of that plan instead of API credits. The extension can't run programs itself, so a small helper does it: the browser starts it when needed, and it runs the **Claude Code**, **Codex** or **Gemini / Antigravity (`agy`)** command-line tool you're already signed into.
 
-1. Sign in to the tool you want to use: run `claude` and `/login` for Claude, or sign in to the ChatGPT or Codex app for ChatGPT.
-2. From the extension's folder, install the helper once:
+1. Sign in to the tool you want to use: run `claude` and `/login` for Claude, sign in to the ChatGPT or Codex app for ChatGPT, or sign in to the Gemini app (or run `agy`) for Gemini.
+2. From the extension's folder, install the helper once (or rerun it after updating):
 
    ```bash
    bash native-host/install.sh
    ```
 
    It registers the helper with Arc, Chrome, Brave, Edge and the other Chromium browsers it finds. Running the store build too? Add its id: `bash native-host/install.sh <your-unpacked-id> <store-id>`. To remove it: `bash native-host/install.sh --uninstall`.
-3. In settings, add **Claude subscription** or **ChatGPT subscription**, click **Connect**, and allow the browser to talk to the helper.
+3. In settings, add **Claude subscription**, **ChatGPT subscription** or **Gemini subscription**, click **Connect**, and allow the browser to talk to the helper.
 
 Summaries count against your plan's usage limits, and are a little slower than an API key, since each one starts the tool.
 

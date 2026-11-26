@@ -121,3 +121,20 @@ test('a profile with nothing to clean is not written to', async () => {
 
   assert.deepEqual(writes, [], 'a fresh install has no residue and needs no write');
 });
+
+test('non-low gemini_subscription models and stale caches are migrated on update', async () => {
+  reset();
+  Object.assign(state, {
+    GEMINI_SUBSCRIPTION: 'connected',
+    gemini_subscription_MODEL: 'gemini-3.8-flash-high',
+    gemini_subscription_CACHED_MODELS: [
+      { id: 'gemini-4-hydrogen-low', name: 'Gemini 4 Hydrogen (Low)' },
+      { id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (High)' }
+    ]
+  });
+
+  await runUpdate();
+
+  assert.equal(state.gemini_subscription_MODEL, 'gemini-4-hydrogen-low');
+  assert.ok(!('gemini_subscription_CACHED_MODELS' in state));
+});

@@ -9,6 +9,22 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Added
+
+- **Summaries through your Gemini subscription.** *Gemini subscription* runs the
+  signed-in Gemini app / Antigravity CLI (`agy`) on your Mac through the native
+  helper (`native-host/`), so summaries come out of your Google AI plan instead
+  of API credits — offering **Gemini 4 Hydrogen** (default) and **Gemini 3.8
+  Flash**, both run at low reasoning effort for speed. Run `bash
+  native-host/install.sh` once (or rerun it if you already installed the
+  helper), then connect **Gemini subscription** in settings.
+
+### Changed
+
+- **Long videos on subscriptions now run up to 10 parts in parallel.** Raised
+  window concurrency from 6 to 10 across Claude, ChatGPT and Gemini
+  subscriptions, keeping videos over three hours to a single parallel wave.
+
 ## 1.10.0 — 2026-11-25
 
 ### Added

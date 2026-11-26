@@ -49,7 +49,7 @@ video when clicked.
    worker runs them in parallel and joins them in video order. API providers
    split above 90 minutes into ~45-minute parts (4 at a time); subscription
    providers set their own `windowing` in `providers.js` (above 25 minutes,
-   ~20-minute parts, 6 at a time).
+   ~20-minute parts, 10 at a time).
 6. **Validation.** `scripts/summary-validator.js` checks every timestamp lands
    on a real cue, in order and in range. A reply that loses more than half its
    points to that check is refused as a whole. A cut-off reply
@@ -69,7 +69,7 @@ and implements `callAPI` (returns `{ text, finishReason }`), `validateKey`,
 | Google Gemini | `gemini-client.js` | Streams (`streamGenerateContent?alt=sse`). Thinking models get extra output budget, from the model's own `thinking` / `outputTokenLimit`. Default `gemini-flash-lite-latest`. |
 | OpenAI | `openai-compatible-client.js` | Also used for user-added custom endpoints (`CUSTOM_PROVIDERS`). |
 | Anthropic | `anthropic-client.js` | |
-| Claude / ChatGPT subscription | `subscription-client.js` | No key. Talks over native messaging to the helper in `native-host/`, which runs the signed-in `claude` or `codex` CLI. See below. |
+| Claude / ChatGPT / Gemini subscription | `subscription-client.js` | No key. Talks over native messaging to the helper in `native-host/`, which runs the signed-in `claude`, `codex` or `agy` CLI. See below. |
 
 Retries live in `callWithRetries` in the service worker. Busy-model errors
 (`provider_down`, usually a 503 "high demand") wait about 5, 12 and 25 seconds;
@@ -85,7 +85,7 @@ failed.
   `generate` → `delta` / `activity` messages, then `done` or `error`. Closing
   the port kills the CLI.
 - `install.sh` copies it to `~/Library/Application Support/TimestampedSummary/`,
-  records the absolute paths of `node`, `claude` and `codex`, and registers host
+  records the absolute paths of `node`, `claude`, `codex` and `agy`, and registers host
   `com.timestamped_summary.bridge` with every Chromium browser it finds (Arc's
   folder is `Arc/User Data/NativeMessagingHosts`). The allowed extension ID is
   the unpacked ID of the folder it runs from.
