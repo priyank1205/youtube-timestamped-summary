@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.11.0 — 2026-11-26
+
 ### Added
 
 - **Summaries through your Gemini subscription.** *Gemini subscription* runs the
